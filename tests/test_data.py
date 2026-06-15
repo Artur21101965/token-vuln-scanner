@@ -26,17 +26,17 @@ def collector(mock_rpc, mock_explorer):
 
 def test_get_storage_at(collector, mock_rpc):
     collector.get_storage_at("0xabc", 0)
-    mock_rpc.call.assert_called_once_with("eth_getStorageAt", ["0xabc", "0x0", "latest"])
+    mock_rpc.get_storage_at.assert_called_once_with("0xabc", 0, "latest")
 
 
 def test_get_code(collector, mock_rpc):
     collector.get_code("0xabc")
-    mock_rpc.call.assert_called_once_with("eth_getCode", ["0xabc", "latest"])
+    mock_rpc.eth_get_code.assert_called_once_with("0xabc", "latest")
 
 
 def test_call_contract(collector, mock_rpc):
     collector.call_contract("0xabc", "0xdeadbeef", Chain.ETHEREUM)
-    mock_rpc.call.assert_called_once()
+    mock_rpc.eth_call.assert_called_once_with("0xabc", "0xdeadbeef", "latest")
 
 
 def test_get_abi(collector, mock_explorer):
@@ -54,3 +54,9 @@ def test_get_source_code(collector, mock_explorer):
     src = collector.get_source_code("0xabc", Chain.ETHEREUM)
     assert src is not None
     mock_explorer.get_source_code.assert_called_once_with("0xabc", Chain.ETHEREUM)
+
+
+def test_rpc_error_raises(collector, mock_rpc, mock_explorer):
+    mock_rpc.eth_call.side_effect = RuntimeError("RPC error: ...")
+    with pytest.raises(RuntimeError):
+        collector.call_contract("0xabc", "0xdata", Chain.ETHEREUM)

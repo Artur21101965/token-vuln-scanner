@@ -52,3 +52,12 @@ class ExplorerClient:
         if data.get("status") != "1" or not data.get("result"):
             return None
         return data["result"][0].get("SourceCode", "")
+
+    def close(self):
+        self._http.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()

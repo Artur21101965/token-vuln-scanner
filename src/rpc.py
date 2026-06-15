@@ -29,3 +29,12 @@ class RpcClient:
 
     def get_storage_at(self, address: str, slot: int, block: str = "latest") -> str:
         return self.call("eth_getStorageAt", [address, hex(slot), block])
+
+    def close(self):
+        self._http.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
