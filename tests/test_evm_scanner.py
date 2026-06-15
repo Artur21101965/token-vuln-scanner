@@ -106,4 +106,4 @@ def test_base_scanner_handles_check_error():
 
 def test_evm_scanner_creates():
     scanner = EvmScanner(data_collector=Mock(), rpc=Mock())
-    assert len(scanner.checks) == 4  # ownership + mint + lp_safety + honeypot checks registered
+    assert len(scanner.checks) == 13  # all EVM checks registered
