@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
-from types import SimpleNamespace
 from typing import Optional
+
+import websockets
 
 from src.types import Chain
 
@@ -15,15 +18,25 @@ SUPPORTED_CHAINS = {"ethereum", "bsc", "solana"}
 LIQUIDITY_THRESHOLD_USD = 500
 
 
+@dataclass
+class _ParsedPair:
+    chain: str
+    token_address: str
+    pair_address: str
+    symbol: str
+    liquidity_usd: float
+    dex: str
+
+
 class DexScreenerMonitor:
     def __init__(self, queue, min_liquidity: float = LIQUIDITY_THRESHOLD_USD):
         self._queue = queue
         self._min_liquidity = min_liquidity
 
     def _filter_by_liquidity(self, token) -> bool:
-        return token.liquidity_usd >= self._min_liquidity
+        return Decimal(str(token.liquidity_usd)) >= self._min_liquidity
 
-    def _parse_pair(self, msg: dict) -> Optional[SimpleNamespace]:
+    def _parse_pair(self, msg: dict) -> Optional[_ParsedPair]:
         chain_id = msg.get("chainId", "")
         if chain_id not in SUPPORTED_CHAINS:
             return None
@@ -35,19 +48,20 @@ class DexScreenerMonitor:
         if not token_address:
             return None
 
-        t = SimpleNamespace()
-        t.chain = chain_id
-        t.token_address = token_address
-        t.pair_address = msg.get("pairAddress", "")
-        t.symbol = symbol
-        t.liquidity_usd = float(msg.get("liquidity", {}).get("usd", 0))
-        t.dex = msg.get("dexId", "")
-        return t
+        return _ParsedPair(
+            chain=chain_id,
+            token_address=token_address,
+            pair_address=msg.get("pairAddress", ""),
+            symbol=symbol,
+            liquidity_usd=float(msg.get("liquidity", {}).get("usd", 0)),
+            dex=msg.get("dexId", ""),
+        )
 
     def _process_message(self, raw: str) -> None:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
+            logger.warning("Malformed JSON received: %s", raw)
             return
 
         pairs = data if isinstance(data, list) else [data]
@@ -71,16 +85,15 @@ class DexScreenerMonitor:
             )
 
     async def run(self):
-        import asyncio
-
-        import websockets
-
+        delay = 1
         while True:
             try:
                 async with websockets.connect(DEXSCREENER_WS_URL) as ws:
                     logger.info("Connected to DexScreener WebSocket")
+                    delay = 1
                     async for message in ws:
                         self._process_message(message)
             except Exception as exc:
                 logger.error("WebSocket error: %s", exc)
-                await asyncio.sleep(5)
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 60)
