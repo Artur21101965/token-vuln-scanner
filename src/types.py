@@ -94,3 +94,4 @@ class PendingToken:
     liquidity_usd: Decimal = Decimal("0.0")
     dex: str = ""
     status: TokenStatus = TokenStatus.PENDING
+    error: str = ""
