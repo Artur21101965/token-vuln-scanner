@@ -2,7 +2,7 @@ from typing import Optional
 from src.scanners.base import BaseCheck, CheckContext
 from src.types import Finding, Severity
 
-PAUSE_SELECTORS = {"0x8456cb59", "0x3f4ba83a", "0x5c975abb"}
+PAUSE_SELECTORS = {"8456cb59", "3f4ba83a", "5c975abb"}
 
 
 class PausableCheck(BaseCheck):
