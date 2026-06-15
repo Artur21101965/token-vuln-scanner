@@ -1,7 +1,8 @@
 from __future__ import annotations
-from enum import IntEnum, auto
+from decimal import Decimal
+from enum import IntEnum, StrEnum, auto
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 
@@ -17,7 +18,10 @@ class Chain(IntEnum):
             "bsc": cls.BSC,
             "solana": cls.SOLANA,
         }
-        return mapping[s.lower()]
+        try:
+            return mapping[s.lower()]
+        except KeyError:
+            raise ValueError(f"Unknown chain: {s}. Valid options: {', '.join(mapping.keys())}")
 
 
 class Severity(IntEnum):
@@ -26,6 +30,13 @@ class Severity(IntEnum):
     MEDIUM = 2
     HIGH = 3
     CRITICAL = 4
+
+
+class TokenStatus(StrEnum):
+    PENDING = "pending"
+    ANALYZING = "analyzing"
+    DONE = "done"
+    FAILED = "failed"
 
 
 @dataclass
@@ -41,7 +52,7 @@ class TokenInfo:
 class PoolInfo:
     address: str
     dex: str
-    liquidity_usd: float
+    liquidity_usd: Decimal
     token0_address: str = ""
     token1_address: str = ""
 
@@ -56,20 +67,11 @@ class Finding:
 
 
 @dataclass
-class CheckResult:
-    check_name: str
-    severity: Severity
-    description: str
-    recommendation: str
-    details: dict = field(default_factory=dict)
-
-
-@dataclass
 class ScanReport:
     token: TokenInfo
     pool: PoolInfo
     findings: list[Finding]
-    scanned_at: datetime = field(default_factory=datetime.utcnow)
+    scanned_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
     def summary(self) -> str:
@@ -84,11 +86,11 @@ class ScanReport:
 
 @dataclass
 class PendingToken:
-    id: int = 0
+    row_id: int = 0
     chain: Chain = Chain.ETHEREUM
     token_address: str = ""
     pair_address: str = ""
     symbol: str = ""
-    liquidity_usd: float = 0.0
+    liquidity_usd: Decimal = Decimal("0.0")
     dex: str = ""
-    status: str = "pending"  # pending | analyzing | done | failed
+    status: TokenStatus = TokenStatus.PENDING

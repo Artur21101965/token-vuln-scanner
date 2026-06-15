@@ -1,6 +1,7 @@
+from decimal import Decimal
 import pytest
 from src.types import (
-    TokenInfo, PoolInfo, Finding, Severity, CheckResult, ScanReport, Chain
+    TokenInfo, PoolInfo, Finding, Severity, ScanReport, Chain, TokenStatus
 )
 
 
@@ -32,7 +33,7 @@ def test_finding_creation():
 def test_scan_report_summary_critical():
     report = ScanReport(
         token=TokenInfo(address="0xabc", symbol="TEST", chain=Chain.ETHEREUM),
-        pool=PoolInfo(address="0xpool", dex="Uniswap V3", liquidity_usd=5000),
+        pool=PoolInfo(address="0xpool", dex="Uniswap V3", liquidity_usd=Decimal("5000")),
         findings=[
             Finding(check_name="x", severity=Severity.CRITICAL, description="", recommendation=""),
             Finding(check_name="y", severity=Severity.MEDIUM, description="", recommendation=""),
@@ -44,7 +45,7 @@ def test_scan_report_summary_critical():
 def test_scan_report_summary_clean():
     report = ScanReport(
         token=TokenInfo(address="0xabc", symbol="TEST", chain=Chain.ETHEREUM),
-        pool=PoolInfo(address="0xpool", dex="Uniswap V3", liquidity_usd=5000),
+        pool=PoolInfo(address="0xpool", dex="Uniswap V3", liquidity_usd=Decimal("5000")),
         findings=[]
     )
     assert report.summary == "✅ No vulnerabilities found"
@@ -54,3 +55,8 @@ def test_chain_from_str():
     assert Chain.from_str("ethereum") == Chain.ETHEREUM
     assert Chain.from_str("bsc") == Chain.BSC
     assert Chain.from_str("solana") == Chain.SOLANA
+
+
+def test_chain_from_str_unknown():
+    with pytest.raises(ValueError, match="Unknown chain"):
+        Chain.from_str("bitcoin")
