@@ -1,6 +1,6 @@
 [rpc]
-ethereum = "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY"
-bsc = "https://bsc-mainnet.g.alchemy.com/v2/YOUR_KEY"
+ethereum = "https://eth.drpc.org"
+bsc = "https://bsc-dataseed.binance.org"
 solana = "https://api.mainnet-beta.solana.com"
 
 [explorer]
