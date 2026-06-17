@@ -4,8 +4,8 @@ import os
 
 import pytest
 
-from src.types import Chain, TokenStatus, PendingToken
-from src.db.queue import TokenQueue
+from src.types import Chain, TokenStatus, PendingToken, ContractTarget
+from src.db.queue import TokenQueue, ContractQueue
 
 
 @pytest.fixture
@@ -138,3 +138,39 @@ def test_claim_next_batch_sets_status(tmp_path):
     batch = q.claim_next_batch(5)
     assert len(batch) == 1
     assert batch[0].status == TokenStatus.ANALYZING
+
+
+def test_contract_queue_init():
+    q = ContractQueue(":memory:")
+    q.init_db()
+    assert q.count_pending() == 0
+
+
+def test_contract_queue_add_and_claim():
+    q = ContractQueue(":memory:")
+    q.init_db()
+    q.add(chain=Chain.ETHEREUM, address="0xabc", source="blockscout", eth_balance=10**18)
+    assert q.count_pending() == 1
+    batch = q.claim_next_batch(10)
+    assert len(batch) == 1
+    assert batch[0].address == "0xabc"
+    assert batch[0].chain == Chain.ETHEREUM
+    assert batch[0].eth_balance == 10**18
+    assert batch[0].source == "blockscout"
+
+
+def test_contract_queue_dedup():
+    q = ContractQueue(":memory:")
+    q.init_db()
+    q.add(Chain.ETHEREUM, "0xabc")
+    q.add(Chain.ETHEREUM, "0xabc")
+    assert q.count_pending() == 1
+
+
+def test_contract_queue_mark():
+    q = ContractQueue(":memory:")
+    q.init_db()
+    q.add(Chain.BSC, "0xabc")
+    batch = q.claim_next_batch(1)
+    q.mark_done(batch[0].row_id)
+    assert q.count_pending() == 0

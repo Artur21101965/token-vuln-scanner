@@ -4,7 +4,7 @@ import sqlite3
 from decimal import Decimal
 from typing import Optional
 
-from src.types import Chain, TokenStatus, PendingToken
+from src.types import Chain, TokenStatus, PendingToken, ContractTarget
 
 
 class TokenQueue:
@@ -165,3 +165,124 @@ class TokenQueue:
                 (token_id,),
             ).fetchone()
             return self._row_to_pending(row) if row else None
+
+
+class ContractQueue:
+    def __init__(self, db_path: str = "scanner.db") -> None:
+        self.db_path = db_path
+        self._conn: Optional[sqlite3.Connection] = None
+
+    def _connect(self) -> sqlite3.Connection:
+        if self._conn is None:
+            self._conn = sqlite3.connect(self.db_path)
+        return self._conn
+
+    def init_db(self) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS contract_targets ("
+                "  row_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "  chain TEXT NOT NULL,"
+                "  address TEXT NOT NULL UNIQUE,"
+                "  source TEXT NOT NULL DEFAULT 'blockscout',"
+                "  eth_balance TEXT NOT NULL DEFAULT '0',"
+                "  token_symbols TEXT NOT NULL DEFAULT '',"
+                "  status TEXT NOT NULL DEFAULT 'pending',"
+                "  error TEXT NOT NULL DEFAULT '',"
+                "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                ")"
+            )
+            conn.commit()
+
+    def add(
+        self,
+        chain: Chain,
+        address: str,
+        source: str = "blockscout",
+        eth_balance: int = 0,
+        token_symbols: str = "",
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO contract_targets "
+                "(chain, address, source, eth_balance, token_symbols, status) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    chain.name.lower(),
+                    address,
+                    source,
+                    str(eth_balance),
+                    token_symbols,
+                    TokenStatus.PENDING.value,
+                ),
+            )
+            conn.commit()
+
+    def count_pending(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM contract_targets WHERE status = ?",
+                (TokenStatus.PENDING.value,),
+            ).fetchone()
+            return row[0] if row else 0
+
+    def _row_to_contract(self, row: tuple) -> ContractTarget:
+        return ContractTarget(
+            row_id=row[0],
+            chain=Chain.from_str(row[1]),
+            address=row[2],
+            source=row[3],
+            eth_balance=int(row[4]),
+            token_symbols=row[5],
+            status=TokenStatus(row[6]),
+            error=row[7],
+            created_at=row[8] if len(row) > 8 else "",
+        )
+
+    def claim_next_batch(self, n: int) -> list[ContractTarget]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT row_id, chain, address, source, eth_balance, "
+                "token_symbols, status, error, created_at "
+                "FROM contract_targets WHERE status = ? ORDER BY created_at ASC LIMIT ?",
+                (TokenStatus.PENDING.value, n),
+            ).fetchall()
+            if not rows:
+                return []
+            ids = [r[0] for r in rows]
+            placeholders = ",".join("?" for _ in ids)
+            conn.execute(
+                f"UPDATE contract_targets SET status = ? WHERE row_id IN ({placeholders})",
+                (TokenStatus.ANALYZING.value, *ids),
+            )
+            conn.commit()
+            return [
+                ContractTarget(
+                    row_id=r[0],
+                    chain=Chain.from_str(r[1]),
+                    address=r[2],
+                    source=r[3],
+                    eth_balance=int(r[4]),
+                    token_symbols=r[5],
+                    status=TokenStatus.ANALYZING,
+                    error=r[7],
+                    created_at=r[8] if len(r) > 8 else "",
+                )
+                for r in rows
+            ]
+
+    def mark_done(self, row_id: int) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE contract_targets SET status = ? WHERE row_id = ?",
+                (TokenStatus.DONE.value, row_id),
+            )
+            conn.commit()
+
+    def mark_failed(self, row_id: int, error: str = "") -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "UPDATE contract_targets SET status = ?, error = ? WHERE row_id = ?",
+                (TokenStatus.FAILED.value, error, row_id),
+            )
+            conn.commit()

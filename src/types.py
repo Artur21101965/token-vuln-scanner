@@ -121,3 +121,16 @@ class PendingToken:
     dex: str = ""
     status: TokenStatus = TokenStatus.PENDING
     error: str = ""
+
+
+@dataclass
+class ContractTarget:
+    row_id: int = 0
+    chain: Chain = Chain.ETHEREUM
+    address: str = ""
+    source: str = ""
+    eth_balance: int = 0
+    token_symbols: str = ""
+    status: TokenStatus = TokenStatus.PENDING
+    error: str = ""
+    created_at: str = ""
