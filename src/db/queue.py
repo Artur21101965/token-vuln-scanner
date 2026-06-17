@@ -80,6 +80,38 @@ class TokenQueue:
             error=row[8],
         )
 
+    def claim_next_batch(self, n: int) -> list[PendingToken]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT row_id, chain, token_address, pair_address, symbol, "
+                "liquidity_usd, dex, status, error "
+                "FROM pending_tokens WHERE status = ? ORDER BY created_at ASC LIMIT ?",
+                (TokenStatus.PENDING.value, n),
+            ).fetchall()
+            if not rows:
+                return []
+            ids = [r[0] for r in rows]
+            placeholders = ",".join("?" for _ in ids)
+            conn.execute(
+                f"UPDATE pending_tokens SET status = ? WHERE row_id IN ({placeholders})",
+                (TokenStatus.ANALYZING.value, *ids),
+            )
+            conn.commit()
+            return [
+                PendingToken(
+                    row_id=r[0],
+                    chain=Chain.from_str(r[1]),
+                    token_address=r[2],
+                    pair_address=r[3],
+                    symbol=r[4],
+                    liquidity_usd=Decimal(r[5]),
+                    dex=r[6],
+                    status=TokenStatus.ANALYZING,
+                    error=r[8],
+                )
+                for r in rows
+            ]
+
     def claim_next(self) -> Optional[PendingToken]:
         with self._connect() as conn:
             row = conn.execute(

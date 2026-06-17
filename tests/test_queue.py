@@ -100,3 +100,41 @@ def test_get_returns_token_by_row_id(queue):
     assert fetched is not None
     assert fetched.token_address == "0xabc"
     assert fetched.symbol == "TEST"
+
+
+def test_claim_next_batch_returns_multiple(tmp_path):
+    db = tmp_path / "test.db"
+    q = TokenQueue(str(db))
+    q.init_db()
+    for i in range(5):
+        q.add(Chain.ETHEREUM, f"0x{i:040x}", "", "T", Decimal("100"), "Uniswap")
+    batch = q.claim_next_batch(3)
+    assert len(batch) == 3
+    assert batch[0].token_address == "0x0000000000000000000000000000000000000000"
+
+
+def test_claim_next_batch_less_than_requested(tmp_path):
+    db = tmp_path / "test.db"
+    q = TokenQueue(str(db))
+    q.init_db()
+    q.add(Chain.ETHEREUM, "0x" + "0" * 40, "", "T", Decimal("100"), "Uniswap")
+    batch = q.claim_next_batch(10)
+    assert len(batch) == 1
+
+
+def test_claim_next_batch_empty(tmp_path):
+    db = tmp_path / "test.db"
+    q = TokenQueue(str(db))
+    q.init_db()
+    batch = q.claim_next_batch(5)
+    assert batch == []
+
+
+def test_claim_next_batch_sets_status(tmp_path):
+    db = tmp_path / "test.db"
+    q = TokenQueue(str(db))
+    q.init_db()
+    q.add(Chain.ETHEREUM, "0x" + "0" * 40, "", "T", Decimal("100"), "Uniswap")
+    batch = q.claim_next_batch(5)
+    assert len(batch) == 1
+    assert batch[0].status == TokenStatus.ANALYZING
