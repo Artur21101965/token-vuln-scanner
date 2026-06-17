@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable
 from src.types import Chain
 from src.rpc import RpcClient
 from src.explorer import ExplorerClient
@@ -8,6 +8,22 @@ class DataCollector:
     def __init__(self, rpc: RpcClient, explorer: ExplorerClient):
         self._rpc = rpc
         self._explorer = explorer
+        self._cache: dict[str, str] = {}
+
+    def _cached(self, key: str, fetcher: Callable[[], str]) -> str:
+        if key not in self._cache:
+            self._cache[key] = fetcher()
+        return self._cache[key]
+
+    def _cached_opt(self, key: str, fetcher: Callable[[], Optional[str]]) -> Optional[str]:
+        if key not in self._cache:
+            result = fetcher()
+            self._cache[key] = result if result is not None else ""
+        val = self._cache[key]
+        return val if val else None
+
+    def clear_cache(self):
+        self._cache.clear()
 
     def get_storage_at(self, address: str, slot: int, block: str = "latest") -> str:
         return self._rpc.get_storage_at(address, slot, block)
@@ -16,12 +32,14 @@ class DataCollector:
         return self._rpc.eth_call(to, data, block)
 
     def get_code(self, address: str, block: str = "latest") -> str:
-        return self._rpc.eth_get_code(address, block)
+        return self._cached(f"code:{address}:{block}",
+            lambda: self._rpc.eth_get_code(address, block))
 
     def get_abi(self, address: str, chain: Chain) -> Optional[str]:
         if chain == Chain.SOLANA:
             return None
-        return self._explorer.get_abi(address, chain)
+        return self._cached_opt(f"abi:{address}:{chain.value}",
+            lambda: self._explorer.get_abi(address, chain))
 
     def get_source_code(self, address: str, chain: Chain) -> Optional[str]:
         if chain == Chain.SOLANA:

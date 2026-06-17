@@ -78,3 +78,34 @@ def test_fallback_detected_rpc_error(collector, mock_rpc):
     mock_rpc.eth_call.side_effect = RuntimeError("connection failed")
     result = collector.fallback_detected("0xabc")
     assert result is False
+
+
+def test_get_code_cached(collector, mock_rpc):
+    mock_rpc.eth_get_code.return_value = "0x1234"
+    r1 = collector.get_code("0xabc")
+    r2 = collector.get_code("0xabc")
+    assert r1 == r2 == "0x1234"
+    mock_rpc.eth_get_code.assert_called_once()
+
+
+def test_get_code_different_addrs_not_cached(collector, mock_rpc):
+    mock_rpc.eth_get_code.side_effect = ["0x1234", "0x5678"]
+    r1 = collector.get_code("0xabc")
+    r2 = collector.get_code("0xdef")
+    assert r1 == "0x1234"
+    assert r2 == "0x5678"
+    assert mock_rpc.eth_get_code.call_count == 2
+
+
+def test_get_abi_cached(collector, mock_explorer):
+    collector.get_abi("0xabc", Chain.ETHEREUM)
+    collector.get_abi("0xabc", Chain.ETHEREUM)
+    mock_explorer.get_abi.assert_called_once()
+
+
+def test_cache_clear(collector, mock_rpc):
+    mock_rpc.eth_get_code.return_value = "0x1234"
+    collector.get_code("0xabc")
+    collector.clear_cache()
+    collector.get_code("0xabc")
+    assert mock_rpc.eth_get_code.call_count == 2
