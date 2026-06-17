@@ -6,6 +6,7 @@ from src.types import TokenInfo, PoolInfo, Finding, Severity, ScanReport
 from src.data import DataCollector
 from src.rpc import RpcClient
 from src.db.deployer_store import DeployerStore
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 @dataclass
@@ -71,18 +72,21 @@ class BaseScanner(ABC):
             ctx.dispatch_selectors = set(selectors.keys())
             ctx.has_fallback = self._data.fallback_detected(token.address)
         findings: list[Finding] = []
-        for check in self.checks:
-            try:
-                result = check.run(ctx)
-                if result is not None:
-                    findings.append(result)
-            except Exception as exc:
-                findings.append(Finding(
-                    check_name=check.name,
-                    severity=Severity.MEDIUM,
-                    description=f"Check failed with error: {exc}",
-                    recommendation="Manual review recommended",
-                ))
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            fut_to_check = {pool.submit(check.run, ctx): check for check in self.checks}
+            for fut in as_completed(fut_to_check):
+                check = fut_to_check[fut]
+                try:
+                    result = fut.result()
+                    if result is not None:
+                        findings.append(result)
+                except Exception as exc:
+                    findings.append(Finding(
+                        check_name=check.name,
+                        severity=Severity.MEDIUM,
+                        description=f"Check failed with error: {exc}",
+                        recommendation="Manual review recommended",
+                    ))
         # Confidence scoring for false positive reduction
         from src.verifiers.confidence import score_confidence, filter_by_confidence, demote_fallback_findings
 

@@ -110,6 +110,51 @@ def test_base_scanner_handles_check_error():
     assert "error" in report.findings[0].description.lower()
 
 
+def test_parallel_checks_collect_all_findings():
+    """All check results are collected when running in parallel."""
+    class TestScanner(BaseScanner):
+        @property
+        def checks(self):
+            return [DummyCheck(), DummyCheck()]
+
+    data = Mock()
+    data.get_code.return_value = ""
+    data.fallback_detected.return_value = False
+    scanner = TestScanner(data_collector=data, rpc=Mock())
+    token = TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM)
+    pool = PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=1000)
+    report = scanner.scan(token, pool)
+    assert len(report.findings) == 2
+
+
+def test_parallel_checks_handles_error():
+    """One failing check doesn't affect other checks in parallel mode."""
+    class FailCheck(BaseCheck):
+        @property
+        def name(self): return "fail"
+        @property
+        def severity(self): return Severity.CRITICAL
+        @property
+        def description(self): return ""
+        @property
+        def recommendation(self): return ""
+        def run(self, ctx): raise ValueError("fail")
+
+    class TestScanner(BaseScanner):
+        @property
+        def checks(self):
+            return [FailCheck(), DummyCheck()]
+
+    data = Mock()
+    data.get_code.return_value = ""
+    data.fallback_detected.return_value = False
+    scanner = TestScanner(data_collector=data, rpc=Mock())
+    token = TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM)
+    pool = PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=1000)
+    report = scanner.scan(token, pool)
+    assert len(report.findings) == 2  # error finding + dummy finding
+
+
 def test_evm_scanner_creates():
     data = Mock()
     data.get_code.return_value = ""
