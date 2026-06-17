@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 from decimal import Decimal
 from typing import Optional
 
@@ -170,12 +171,9 @@ class TokenQueue:
 class ContractQueue:
     def __init__(self, db_path: str = "scanner.db") -> None:
         self.db_path = db_path
-        self._conn: Optional[sqlite3.Connection] = None
 
     def _connect(self) -> sqlite3.Connection:
-        if self._conn is None:
-            self._conn = sqlite3.connect(self.db_path)
-        return self._conn
+        return sqlite3.connect(self.db_path)
 
     def init_db(self) -> None:
         with self._connect() as conn:
@@ -256,20 +254,7 @@ class ContractQueue:
                 (TokenStatus.ANALYZING.value, *ids),
             )
             conn.commit()
-            return [
-                ContractTarget(
-                    row_id=r[0],
-                    chain=Chain.from_str(r[1]),
-                    address=r[2],
-                    source=r[3],
-                    eth_balance=int(r[4]),
-                    token_symbols=r[5],
-                    status=TokenStatus.ANALYZING,
-                    error=r[7],
-                    created_at=r[8] if len(r) > 8 else "",
-                )
-                for r in rows
-            ]
+            return [replace(self._row_to_contract(r), status=TokenStatus.ANALYZING) for r in rows]
 
     def mark_done(self, row_id: int) -> None:
         with self._connect() as conn:
@@ -286,3 +271,13 @@ class ContractQueue:
                 (TokenStatus.FAILED.value, error, row_id),
             )
             conn.commit()
+
+    def get(self, row_id: int) -> Optional[ContractTarget]:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT row_id, chain, address, source, eth_balance, "
+                "token_symbols, status, error, created_at "
+                "FROM contract_targets WHERE row_id = ?",
+                (row_id,),
+            ).fetchone()
+            return self._row_to_contract(row) if row else None

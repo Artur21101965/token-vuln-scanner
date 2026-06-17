@@ -140,14 +140,16 @@ def test_claim_next_batch_sets_status(tmp_path):
     assert batch[0].status == TokenStatus.ANALYZING
 
 
-def test_contract_queue_init():
-    q = ContractQueue(":memory:")
+def test_contract_queue_init(tmp_path):
+    db = tmp_path / "test.db"
+    q = ContractQueue(str(db))
     q.init_db()
     assert q.count_pending() == 0
 
 
-def test_contract_queue_add_and_claim():
-    q = ContractQueue(":memory:")
+def test_contract_queue_add_and_claim(tmp_path):
+    db = tmp_path / "test.db"
+    q = ContractQueue(str(db))
     q.init_db()
     q.add(chain=Chain.ETHEREUM, address="0xabc", source="blockscout", eth_balance=10**18)
     assert q.count_pending() == 1
@@ -159,18 +161,36 @@ def test_contract_queue_add_and_claim():
     assert batch[0].source == "blockscout"
 
 
-def test_contract_queue_dedup():
-    q = ContractQueue(":memory:")
+def test_contract_queue_dedup(tmp_path):
+    db = tmp_path / "test.db"
+    q = ContractQueue(str(db))
     q.init_db()
     q.add(Chain.ETHEREUM, "0xabc")
     q.add(Chain.ETHEREUM, "0xabc")
     assert q.count_pending() == 1
 
 
-def test_contract_queue_mark():
-    q = ContractQueue(":memory:")
+def test_contract_queue_mark(tmp_path):
+    db = tmp_path / "test.db"
+    q = ContractQueue(str(db))
     q.init_db()
     q.add(Chain.BSC, "0xabc")
     batch = q.claim_next_batch(1)
     q.mark_done(batch[0].row_id)
+    row = q.get(batch[0].row_id)
+    assert row is not None
+    assert row.status == TokenStatus.DONE
     assert q.count_pending() == 0
+
+
+def test_contract_queue_mark_failed(tmp_path):
+    db = tmp_path / "test.db"
+    q = ContractQueue(str(db))
+    q.init_db()
+    q.add(Chain.ETHEREUM, "0xabc")
+    batch = q.claim_next_batch(1)
+    q.mark_failed(batch[0].row_id, "test error")
+    row = q.get(batch[0].row_id)
+    assert row is not None
+    assert row.status == TokenStatus.FAILED
+    assert row.error == "test error"
