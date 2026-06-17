@@ -14,6 +14,7 @@ Profiles:
     solana-exploit   — Solana only, all checks, retro scan, verify
 """
 import logging
+import os
 import sys
 import tomllib
 from typing import Optional
@@ -173,6 +174,7 @@ def main():
         deployer_store=deployer_store,
         top_token_scanner=top_scanner,
         abi_resolver=abi_resolver,
+        max_workers=int(os.environ.get("SCAN_WORKERS", "4")),
     )
     analyzer.run(interval=config["analyzer"]["poll_interval"])
 

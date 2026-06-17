@@ -1,7 +1,9 @@
+import concurrent.futures
 import json
 import logging
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
@@ -29,6 +31,7 @@ class Analyzer:
         deployer_store: Optional[DeployerStore] = None,
         top_token_scanner: Optional[TopTokenScanner] = None,
         abi_resolver: Optional[AbiResolver] = None,
+        max_workers: int = 4,
     ):
         self._queue = queue
         self._scanners = scanners
@@ -37,6 +40,7 @@ class Analyzer:
         self._deployer_store = deployer_store
         self._top_token_scanner = top_token_scanner
         self._abi_resolver = abi_resolver
+        self._max_workers = max_workers
         self._last_rescan_check: Optional[datetime] = None
 
     def _get_scanner(self, chain: Chain) -> Optional[BaseScanner]:
@@ -229,12 +233,44 @@ class Analyzer:
             self._queue.mark_failed(token.row_id, error=str(exc))
             return True
 
+    def process_batch(self) -> int:
+        """Process up to max_workers tokens concurrently. Returns count of tokens processed."""
+        tokens = self._queue.claim_next_batch(self._max_workers)
+        if not tokens:
+            return 0
+
+        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+            fut_to_token = {}
+            for token in tokens:
+                chain = token.chain
+                scanner = self._get_scanner(chain)
+                if scanner is None:
+                    self._queue.mark_failed(token.row_id, error=f"No scanner for chain: {chain.name}")
+                    continue
+                fut = pool.submit(self._scan_and_report, token, chain, scanner)
+                fut_to_token[fut] = token
+
+            for fut in as_completed(fut_to_token):
+                token = fut_to_token[fut]
+                try:
+                    fut.result()
+                    self._queue.mark_done(token.row_id)
+                    logger.info("Done %s — batch worker", token.symbol)
+                except Exception as exc:
+                    logger.error("Failed %s: %s", token.symbol, exc)
+                    self._queue.mark_failed(token.row_id, error=str(exc))
+
+        return len(tokens)
+
     def run(self, interval: float = 1.0):
-        logger.info("Analyzer started")
+        logger.info("Analyzer started (max_workers=%d)", self._max_workers)
         idle_cycles = 0
         while True:
             try:
-                if not self.process_one():
+                count = self.process_batch()
+                if count > 0:
+                    idle_cycles = 0
+                else:
                     idle_cycles += 1
                     if idle_cycles >= 10:
                         self._check_slot_changes()
@@ -242,8 +278,6 @@ class Analyzer:
                         self._scan_top_tokens()
                         idle_cycles = 0
                     time.sleep(interval)
-                else:
-                    idle_cycles = 0
             except KeyboardInterrupt:
                 break
             except Exception as exc:

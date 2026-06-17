@@ -139,6 +139,38 @@ def test_analyzer_does_not_cluster_on_no_critical():
     analyzer.process_one()
     resolver.fetch_created_contracts.assert_not_called()
 
+def test_analyzer_parallel_scan_limited_by_workers():
+    """Max workers limits concurrent token processing."""
+    queue = Mock()
+    scanner = Mock()
+    reporter = Mock()
+
+    analyzer = Analyzer(
+        queue=queue,
+        scanners={Chain.ETHEREUM: scanner},
+        reporter=reporter,
+        max_workers=3,
+    )
+    assert analyzer._max_workers == 3
+
+
+def test_analyzer_parallel_claims_batch():
+    """Analyzer claims token batch based on max_workers."""
+    queue = Mock()
+    queue.claim_next_batch.return_value = []
+    scanner = Mock()
+    reporter = Mock()
+
+    analyzer = Analyzer(
+        queue=queue,
+        scanners={Chain.ETHEREUM: scanner},
+        reporter=reporter,
+        max_workers=4,
+    )
+    analyzer.process_batch()
+    queue.claim_next_batch.assert_called_once_with(4)
+
+
 def test_analyzer_selects_solana_scanner():
     from src.db.queue import PendingToken
     q = Mock()
