@@ -60,3 +60,21 @@ def test_rpc_error_raises(collector, mock_rpc, mock_explorer):
     mock_rpc.eth_call.side_effect = RuntimeError("RPC error: ...")
     with pytest.raises(RuntimeError):
         collector.call_contract("0xabc", "0xdata", Chain.ETHEREUM)
+
+
+def test_fallback_detected_true(collector, mock_rpc):
+    mock_rpc.eth_call.return_value = "0x"
+    result = collector.fallback_detected("0xabc")
+    assert result is True
+
+
+def test_fallback_detected_false(collector, mock_rpc):
+    mock_rpc.eth_call.side_effect = RuntimeError("execution reverted")
+    result = collector.fallback_detected("0xabc")
+    assert result is False
+
+
+def test_fallback_detected_rpc_error(collector, mock_rpc):
+    mock_rpc.eth_call.side_effect = RuntimeError("connection failed")
+    result = collector.fallback_detected("0xabc")
+    assert result is False

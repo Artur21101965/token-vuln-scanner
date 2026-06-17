@@ -27,3 +27,52 @@ class DataCollector:
         if chain == Chain.SOLANA:
             return None
         return self._explorer.get_source_code(address, chain)
+
+    def get_creator_address(self, address: str, chain: Chain) -> Optional[str]:
+        if chain == Chain.SOLANA:
+            return None
+        return self._explorer.get_contract_creation(address, chain)
+
+    def is_verified(self, address: str, chain: Chain) -> bool:
+        return self.get_abi(address, chain) is not None
+
+    def get_total_supply(self, address: str, block: str = "latest") -> int:
+        selector = "0x18160ddd"
+        raw = self._rpc.eth_call(address, selector, block)
+        return int(raw, 16) if raw and len(raw) > 2 else 0
+
+    def get_balance_of(self, address: str, wallet: str, block: str = "latest") -> int:
+        padded = wallet.lower().replace("0x", "").zfill(64)
+        selector = "0x70a08231" + padded
+        raw = self._rpc.eth_call(address, selector, block)
+        return int(raw, 16) if raw and len(raw) > 2 else 0
+
+    def get_name(self, address: str) -> str:
+        selector = "0x06fdde03"
+        raw = self._rpc.eth_call(address, selector)
+        if not raw or len(raw) < 2:
+            return ""
+        try:
+            hex_str = raw[2:]
+            offset = int(hex_str[:64], 16) * 2 + 64
+            length = int(hex_str[64:128], 16) * 2
+            raw_name = bytes.fromhex(hex_str[offset:offset + length])
+            return raw_name.decode("utf-8", errors="replace")
+        except Exception:
+            return ""
+
+    def fallback_detected(self, address: str) -> bool:
+        try:
+            data = "0xdeadbeef" + "0" * 64
+            self._rpc.eth_call(address, data)
+            return True
+        except Exception:
+            return False
+
+    def get_decimals(self, address: str) -> int:
+        selector = "0x313ce567"
+        raw = self._rpc.eth_call(address, selector)
+        try:
+            return int(raw, 16) if raw else 18
+        except Exception:
+            return 18
