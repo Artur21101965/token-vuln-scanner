@@ -9,6 +9,14 @@ from typing import Optional
 class Chain(IntEnum):
     ETHEREUM = auto()
     BSC = auto()
+    ARBITRUM = auto()
+    BASE = auto()
+    POLYGON = auto()
+    AVALANCHE = auto()
+    OPTIMISM = auto()
+    ZKSYNC = auto()
+    LINEA = auto()
+    SCROLL = auto()
     SOLANA = auto()
 
     @classmethod
@@ -16,6 +24,14 @@ class Chain(IntEnum):
         mapping = {
             "ethereum": cls.ETHEREUM,
             "bsc": cls.BSC,
+            "arbitrum": cls.ARBITRUM,
+            "base": cls.BASE,
+            "polygon": cls.POLYGON,
+            "avalanche": cls.AVALANCHE,
+            "optimism": cls.OPTIMISM,
+            "zksync": cls.ZKSYNC,
+            "linea": cls.LINEA,
+            "scroll": cls.SCROLL,
             "solana": cls.SOLANA,
         }
         try:
@@ -64,6 +80,7 @@ class Finding:
     description: str
     recommendation: str
     details: dict = field(default_factory=dict)
+    confidence: float = 1.0
 
 
 @dataclass
@@ -82,6 +99,15 @@ class ScanReport:
             by_sev[f.severity.name] = by_sev.get(f.severity.name, 0) + 1
         parts = [f"{sev}={cnt}" for sev, cnt in sorted(by_sev.items(), reverse=True)]
         return f"{'⚠️'} {', '.join(parts)}"
+
+
+@dataclass
+class DeployerInfo:
+    address: str
+    chain_name: str = ""
+    token_count: int = 0
+    critical_count: int = 0
+    first_seen: str = ""
 
 
 @dataclass

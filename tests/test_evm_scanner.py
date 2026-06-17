@@ -116,3 +116,103 @@ def test_evm_scanner_creates():
     data.fallback_detected.return_value = False
     scanner = EvmScanner(data_collector=data, rpc=Mock())
     assert len(scanner.checks) == 27  # external + deployer/risk + bytecode + cross-contract + historical + storage + sandwich
+
+
+def test_confidence_filters_fallback_false_positive():
+    """Forwarding contract with fallback but no dispatch selectors should filter selector-based findings."""
+    class SelectorCheck(BaseCheck):
+        @property
+        def name(self): return "withdraw_check"
+        @property
+        def severity(self): return Severity.CRITICAL
+        @property
+        def description(self): return "Withdraw function detected"
+        @property
+        def recommendation(self): return "Review"
+        def run(self, ctx):
+            f = Finding(check_name=self.name, severity=self.severity,
+                       description=self.description, recommendation=self.recommendation)
+            f._selector_based = True  # marked by check
+            return f
+
+    class TestScanner(BaseScanner):
+        @property
+        def checks(self): return [SelectorCheck()]
+
+    data = Mock()
+    data.get_code.return_value = "0x60006000fd"  # simple bytecode (no dispatch table)
+    data.fallback_detected.return_value = True  # has fallback
+    scanner = TestScanner(data_collector=data, rpc=Mock())
+    token = TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM)
+    pool = PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=1000)
+    report = scanner.scan(token, pool)
+    # Low confidence findings should be filtered out
+    assert len(report.findings) == 0, f"Expected 0 findings, got {len(report.findings)}"
+
+
+def test_confidence_keeps_high_confidence():
+    """Contract without fallback should keep selector-based findings."""
+    class SelectorCheck(BaseCheck):
+        @property
+        def name(self): return "mint_check"
+        @property
+        def severity(self): return Severity.HIGH
+        @property
+        def description(self): return "Mint function detected"
+        @property
+        def recommendation(self): return "Review"
+        def run(self, ctx):
+            f = Finding(check_name=self.name, severity=self.severity,
+                       description=self.description, recommendation=self.recommendation)
+            f._selector_based = True
+            return f
+
+    class TestScanner(BaseScanner):
+        @property
+        def checks(self): return [SelectorCheck()]
+
+    data = Mock()
+    # Bytecode with a dispatch table so dispatch_selectors is non-empty
+    data.get_code.return_value = "0x" + "".join([
+        "6000", "35", "600e", "1c", "80",
+        "6340c10f19", "14", "610100", "57",
+        "fd",
+    ])
+    data.fallback_detected.return_value = False  # no fallback
+    scanner = TestScanner(data_collector=data, rpc=Mock())
+    token = TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM)
+    pool = PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=1000)
+    report = scanner.scan(token, pool)
+    assert len(report.findings) == 1
+    assert report.findings[0].confidence >= 0.7
+
+
+def test_confidence_preserves_non_selector():
+    """Non-selector-based findings (e.g., supply/balance checks) should always pass through."""
+    class NonSelectorCheck(BaseCheck):
+        @property
+        def name(self): return "supply_check"
+        @property
+        def severity(self): return Severity.MEDIUM
+        @property
+        def description(self): return "Supply issue"
+        @property
+        def recommendation(self): return "Review"
+        def run(self, ctx):
+            return Finding(check_name=self.name, severity=self.severity,
+                         description=self.description, recommendation=self.recommendation)
+            # No _selector_based flag = non-selector
+
+    class TestScanner(BaseScanner):
+        @property
+        def checks(self): return [NonSelectorCheck()]
+
+    data = Mock()
+    data.get_code.return_value = ""
+    data.fallback_detected.return_value = True
+    scanner = TestScanner(data_collector=data, rpc=Mock())
+    token = TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM)
+    pool = PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=1000)
+    report = scanner.scan(token, pool)
+    assert len(report.findings) == 1  # non-selector should survive
+    assert report.findings[0].confidence == 1.0

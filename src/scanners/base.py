@@ -83,4 +83,24 @@ class BaseScanner(ABC):
                     description=f"Check failed with error: {exc}",
                     recommendation="Manual review recommended",
                 ))
+        # Confidence scoring for false positive reduction
+        from src.verifiers.confidence import score_confidence, filter_by_confidence, demote_fallback_findings
+
+        scores = {}
+        for f in findings:
+            is_selector_based = getattr(f, "_selector_based", False)
+            # For selector-based findings, check if any dispatch selectors exist
+            # (indicating the contract has a real dispatch table, not just fallback)
+            has_dispatch = len(ctx.dispatch_selectors) > 0
+            score = score_confidence(
+                has_fallback=ctx.has_fallback,
+                in_dispatch_table=has_dispatch,
+                eth_call_succeeded=True,
+                selector_based=is_selector_based,
+            )
+            scores[id(f)] = score
+            f.confidence = score
+
+        findings = demote_fallback_findings(findings, scores)
+        findings = filter_by_confidence(findings, scores)
         return ScanReport(token=token, pool=pool, findings=findings)
