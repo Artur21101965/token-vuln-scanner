@@ -7,4 +7,5 @@ from src.rpc import RpcClient
 
 def test_solana_scanner_creates():
     scanner = SolanaScanner(data_collector=Mock(), rpc=Mock())
-    assert len(scanner.checks) > 0
+    assert len(scanner.checks) == 3
+    assert all(c.name for c in scanner.checks)

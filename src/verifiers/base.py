@@ -25,3 +25,7 @@ class Verifier(ABC):
     @abstractmethod
     def verify(self, ctx: CheckContext, finding: Finding) -> VerificationResult:
         ...
+
+    def verify_chain(self, ctx: CheckContext, findings: list[Finding]) -> list[Finding]:
+        """Optional: verify attack chains across multiple findings. Default: no-op."""
+        return findings

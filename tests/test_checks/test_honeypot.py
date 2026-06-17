@@ -17,4 +17,4 @@ def test_honeypot_always_flags_for_manual_review():
     result = check.run(ctx)
     assert result is not None
     assert result.severity.name == "CRITICAL"
-    assert "manual review" in result.description.lower()
+    assert "swap simulation" in result.description.lower()

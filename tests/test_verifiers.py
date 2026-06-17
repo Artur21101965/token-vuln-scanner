@@ -48,7 +48,7 @@ def test_honeypot_verifier_no_pair_address():
     f = Finding(check_name="potential_honeypot", severity=Severity.CRITICAL, description="", recommendation="")
     v = HoneypotVerifier()
     r = v.verify(ctx, f)
-    assert r.confirmed is True
+    assert r.confirmed is False
     assert r.confidence < 1.0
 
 
@@ -88,8 +88,63 @@ def test_honeypot_verifier_sell_reverts():
     f = Finding(check_name="potential_honeypot", severity=Severity.CRITICAL, description="", recommendation="")
     v = HoneypotVerifier()
     r = v.verify(ctx, f)
-    assert r.confirmed is True  # confirmed as honeypot
+    assert r.confirmed is True
     assert r.confidence > 0.5
+
+
+def test_honeypot_verifier_bsc():
+    rpc = Mock(spec=RpcClient)
+    abi_encoded = (
+        "0x"
+        "0000000000000000000000000000000000000000000000000000000000000020"
+        "0000000000000000000000000000000000000000000000000000000000000003"
+        "00000000000000000000000000000000000000000000000000000002540be400"
+        "0000000000000000000000000000000000000000000000000000000000000064"
+        "0000000000000000000000000000000000000000000000000000000000000032"
+    )
+    rpc.eth_call.return_value = abi_encoded
+    ctx = CheckContext(
+        token=TokenInfo(address="0xabc", symbol="T", chain=Chain.BSC),
+        pool=PoolInfo(address="0xpool", dex="PancakeSwap", liquidity_usd=5000),
+        data_collector=Mock(spec=DataCollector),
+        rpc=rpc,
+    )
+    f = Finding(check_name="potential_honeypot", severity=Severity.CRITICAL, description="", recommendation="")
+    v = HoneypotVerifier()
+    r = v.verify(ctx, f)
+    assert r.confirmed is False
+    assert "BSC" in r.evidence
+
+
+def test_honeypot_verifier_polygon():
+    rpc = Mock(spec=RpcClient)
+    rpc.eth_call.side_effect = RuntimeError("reverted")
+    ctx = CheckContext(
+        token=TokenInfo(address="0xabc", symbol="T", chain=Chain.POLYGON),
+        pool=PoolInfo(address="0xpool", dex="QuickSwap", liquidity_usd=5000),
+        data_collector=Mock(spec=DataCollector),
+        rpc=rpc,
+    )
+    f = Finding(check_name="potential_honeypot", severity=Severity.CRITICAL, description="", recommendation="")
+    v = HoneypotVerifier()
+    r = v.verify(ctx, f)
+    assert r.confirmed is True
+    assert "POLYGON" in r.evidence
+
+
+def test_honeypot_verifier_unsupported_chain():
+    rpc = Mock(spec=RpcClient)
+    ctx = CheckContext(
+        token=TokenInfo(address="0xabc", symbol="T", chain=Chain.SOLANA),
+        pool=PoolInfo(address="0xpool", dex="Raydium", liquidity_usd=5000),
+        data_collector=Mock(spec=DataCollector),
+        rpc=rpc,
+    )
+    f = Finding(check_name="potential_honeypot", severity=Severity.CRITICAL, description="", recommendation="")
+    v = HoneypotVerifier()
+    r = v.verify(ctx, f)
+    assert r.confirmed is False
+    assert r.confidence == 0.0
 
 
 def test_verifier_runner_runs_applicable():
@@ -137,4 +192,73 @@ def test_verifier_runner_dismisses_false_positive():
     runner = VerifierRunner(verifiers=[HoneypotVerifier()])
     result = runner.verify_findings(ctx, findings)
     assert result[0].details["verified"] is False  # false positive
-    assert "false positive" in result[0].description.lower()
+    assert "dismissed" in result[0].description.lower()
+
+
+# ── Multi-step verifier tests ──────────────────────────────────────────────────
+
+def _chain_finding(check_name: str, selector: str, severity=Severity.CRITICAL) -> Finding:
+    return Finding(
+        check_name=check_name, severity=severity,
+        description=check_name, recommendation="fix it",
+        details={"selector": selector},
+    )
+
+
+class TestMultiStepVerifier:
+    def test_name(self):
+        from src.verifiers.multi_step import MultiStepVerifier
+        v = MultiStepVerifier()
+        assert v.name == "multi_step"
+
+    def test_can_verify_returns_false(self):
+        from src.verifiers.multi_step import MultiStepVerifier
+        v = MultiStepVerifier()
+        assert v.can_verify(_chain_finding("test", "f2fde38b")) is False
+
+    def test_no_matching_chain_returns_no_change(self):
+        from src.verifiers.multi_step import MultiStepVerifier
+        rpc = Mock(spec=RpcClient)
+        ctx = CheckContext(token=TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM),
+                           pool=PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=5000),
+                           data_collector=Mock(spec=DataCollector), rpc=rpc)
+        findings = [_chain_finding("some_unknown_check", "8129fc1c")]
+        result = MultiStepVerifier().verify_chain(ctx, findings)
+        assert len(result) == 1
+        assert "multi_step_chains" not in result[0].details
+
+    def test_ownership_takeover_chain_detected(self):
+        from src.verifiers.multi_step import MultiStepVerifier
+        rpc = Mock(spec=RpcClient)
+        rpc.eth_call.return_value = "0x"
+        ctx = CheckContext(token=TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM),
+                           pool=PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=5000),
+                           data_collector=Mock(spec=DataCollector), rpc=rpc)
+        findings = [_chain_finding("public_ownership_transfer", "f2fde38b"),
+                    _chain_finding("unprotected_upgrade", "3659cfe6")]
+        result = MultiStepVerifier().verify_chain(ctx, findings)
+        chains = result[0].details.get("multi_step_chains", [])
+        assert any(c["chain"] == "ownership_takeover" for c in chains)
+
+    def test_missing_step_no_chain(self):
+        from src.verifiers.multi_step import MultiStepVerifier
+        rpc = Mock(spec=RpcClient)
+        ctx = CheckContext(token=TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM),
+                           pool=PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=5000),
+                           data_collector=Mock(spec=DataCollector), rpc=rpc)
+        findings = [_chain_finding("public_ownership_transfer", "f2fde38b")]
+        result = MultiStepVerifier().verify_chain(ctx, findings)
+        assert "multi_step_chains" not in result[0].details
+
+    def test_chain_via_runner(self):
+        from src.verifiers.multi_step import MultiStepVerifier
+        rpc = Mock(spec=RpcClient)
+        rpc.eth_call.return_value = "0x"
+        ctx = CheckContext(token=TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM),
+                           pool=PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=5000),
+                           data_collector=Mock(spec=DataCollector), rpc=rpc)
+        findings = [_chain_finding("unprotected_mint", "40c10f19"),
+                    _chain_finding("unprotected_withdraw", "2e1a7d4d")]
+        runner = VerifierRunner(verifiers=[MultiStepVerifier()])
+        result = runner.verify_findings(ctx, findings)
+        assert "multi_step_chains" in result[0].details

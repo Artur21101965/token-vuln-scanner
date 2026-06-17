@@ -18,12 +18,14 @@ class HoneypotCheck(BaseCheck):
 
     @property
     def recommendation(self) -> str:
-        return "Manual verification required — simulate a full buy+sell cycle"
+        return "Run a buy+sell swap simulation to confirm"
 
     def run(self, ctx: CheckContext) -> Optional[Finding]:
+        if not ctx.pool.address:
+            return None
         return Finding(
             check_name=self.name,
             severity=self.severity,
-            description="Honeypot detection requires swap simulation — flagged for manual review",
+            description="Honeypot detection requires swap simulation — flagged for verification",
             recommendation=self.recommendation,
         )

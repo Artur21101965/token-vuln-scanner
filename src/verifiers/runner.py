@@ -19,13 +19,23 @@ class VerifierRunner:
                     updated.details["verification_confidence"] = result.confidence
                     updated.details["verification_evidence"] = result.evidence
                     updated.details["verifier"] = verifier.name
+
                     if not result.confirmed:
-                        updated.severity = finding.severity
-                        updated.description += f" [VERIFIED: false positive — {result.evidence}]"
+                        updated.description += f" [DISMISSED: {result.evidence}]"
+                        verified_finding = updated
+                    elif result.confidence == 0.0:
+                        updated.description += f" [CANNOT VERIFY: {result.evidence}]"
+                        verified_finding = updated
+                    elif result.confidence < 0.5:
+                        updated.description += f" [FLAGGED: {result.evidence}]"
                         verified_finding = updated
                     else:
                         updated.description += f" [CONFIRMED: {result.evidence}]"
                         verified_finding = updated
                     break
             verified.append(verified_finding)
+
+        for verifier in self._verifiers:
+            verified = verifier.verify_chain(ctx, verified)
+
         return verified

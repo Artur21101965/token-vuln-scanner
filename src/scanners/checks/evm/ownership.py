@@ -34,11 +34,13 @@ class OwnerNotRenouncedCheck(BaseCheck):
             owner = "0x" + result[-40:].lower()
             if owner in BURN_ADDRESSES:
                 return None
-            return Finding(
+            finding = Finding(
                 check_name=self.name,
                 severity=self.severity,
                 description=f"Owner {owner} is not renounced",
                 recommendation=self.recommendation,
             )
+            finding._selector_based = True
+            return finding
         except Exception:
             return None

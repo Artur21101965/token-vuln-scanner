@@ -14,19 +14,27 @@ class HiddenSelfdestructCheck(BaseCheck):
 
     @property
     def description(self) -> str:
-        return "Contract may contain SELFDESTRUCT opcode (0xFF)"
+        return "Contract contains SELFDESTRUCT — can be destroyed"
 
     @property
     def recommendation(self) -> str:
-        return "Owner can destroy contract and drain funds"
+        return "If SELFDESTRUCT is callable by anyone, the contract can be erased and funds lost"
 
     def run(self, ctx: CheckContext) -> Optional[Finding]:
         code = ctx.data_collector.get_code(ctx.token.address)
-        if code and "selfdestruct" in code.lower():
+        if not code or len(code) < 10:
+            return None
+
+        if "selfdestruct" in code.lower():
             return Finding(
                 check_name=self.name,
-                severity=self.severity,
-                description="Contract source mentions 'selfdestruct'",
+                severity=Severity.CRITICAL,
+                description="Source code mentions 'selfdestruct' — may be callable",
                 recommendation=self.recommendation,
             )
+
+        code_hex = code.lower().removeprefix("0x")
+        if "ff" in code_hex:
+            return None  # bytecode-only match is too unreliable — false positive on most contracts
+
         return None

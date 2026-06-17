@@ -54,7 +54,15 @@ def test_scan_report_summary_clean():
 def test_chain_from_str():
     assert Chain.from_str("ethereum") == Chain.ETHEREUM
     assert Chain.from_str("bsc") == Chain.BSC
+    assert Chain.from_str("arbitrum") == Chain.ARBITRUM
+    assert Chain.from_str("base") == Chain.BASE
+    assert Chain.from_str("polygon") == Chain.POLYGON
+    assert Chain.from_str("avalanche") == Chain.AVALANCHE
+    assert Chain.from_str("optimism") == Chain.OPTIMISM
     assert Chain.from_str("solana") == Chain.SOLANA
+    assert Chain.from_str("zksync") == Chain.ZKSYNC
+    assert Chain.from_str("linea") == Chain.LINEA
+    assert Chain.from_str("scroll") == Chain.SCROLL
 
 
 def test_chain_from_str_unknown():

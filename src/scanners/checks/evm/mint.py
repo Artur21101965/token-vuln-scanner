@@ -38,12 +38,14 @@ class MintCheck(BaseCheck):
                         continue
                     name = item.get("name", "").lower()
                     if "mint" in name:
-                        return Finding(
+                        finding = Finding(
                             check_name=self.name,
                             severity=self.severity,
                             description=f"Mint function '{item.get('name')}' found in ABI",
                             recommendation=self.recommendation,
                         )
+                        finding._selector_based = True
+                        return finding
             except json.JSONDecodeError:
                 pass
 
@@ -52,11 +54,13 @@ class MintCheck(BaseCheck):
             code_hex = code.lower().removeprefix("0x")
             for sel in MINT_SELECTORS:
                 if sel in code_hex:
-                    return Finding(
+                    finding = Finding(
                         check_name=self.name,
                         severity=self.severity,
                         description=f"Mint selector {sel} found in bytecode",
                         recommendation=self.recommendation,
                     )
+                    finding._selector_based = True
+                    return finding
 
         return None

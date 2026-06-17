@@ -12,6 +12,14 @@ class ExplorerClient:
         urls = {
             Chain.ETHEREUM: "https://api.etherscan.io",
             Chain.BSC: "https://api.bscscan.com",
+            Chain.ARBITRUM: "https://api.arbiscan.io",
+            Chain.BASE: "https://api.basescan.org",
+            Chain.POLYGON: "https://api.polygonscan.com",
+            Chain.AVALANCHE: "https://api.snowtrace.io",
+            Chain.OPTIMISM: "https://api-optimistic.etherscan.io",
+            Chain.ZKSYNC: "https://api-era.zksync.network",
+            Chain.LINEA: "https://api.lineascan.build",
+            Chain.SCROLL: "https://api.scrollscan.com",
         }
         return urls.get(chain, "")
 
@@ -52,6 +60,28 @@ class ExplorerClient:
         if data.get("status") != "1" or not data.get("result"):
             return None
         return data["result"][0].get("SourceCode", "")
+
+    def get_contract_creation(self, address: str, chain: Chain) -> Optional[str]:
+        if chain == Chain.SOLANA:
+            return None
+        base = self._base_url(chain)
+        if not base:
+            return None
+        params = {
+            "module": "contract",
+            "action": "getcontractcreation",
+            "contractaddresses": address,
+            "apikey": self._key,
+        }
+        try:
+            resp = self._http.get(f"{base}/api", params=params, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("status") != "1" or not data.get("result"):
+                return None
+            return data["result"][0].get("contractCreator", "")
+        except Exception:
+            return None
 
     def close(self):
         self._http.close()
