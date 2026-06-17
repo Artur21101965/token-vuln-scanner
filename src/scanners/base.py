@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional
 from typing import Optional
 from src.types import TokenInfo, PoolInfo, Finding, Severity, ScanReport
 from src.data import DataCollector
 from src.rpc import RpcClient
+from src.db.deployer_store import DeployerStore
 
 
 @dataclass
@@ -12,6 +14,9 @@ class CheckContext:
     pool: PoolInfo
     data_collector: DataCollector
     rpc: RpcClient
+    deployer_store: Optional[DeployerStore] = None
+    dispatch_selectors: set[str] = field(default_factory=set)
+    has_fallback: bool = False
 
 
 class BaseCheck(ABC):
@@ -41,9 +46,10 @@ class BaseCheck(ABC):
 
 
 class BaseScanner(ABC):
-    def __init__(self, data_collector: DataCollector, rpc: RpcClient):
+    def __init__(self, data_collector: DataCollector, rpc: RpcClient, deployer_store: Optional[DeployerStore] = None):
         self._data = data_collector
         self._rpc = rpc
+        self._deployer_store = deployer_store
 
     @property
     @abstractmethod
@@ -56,7 +62,14 @@ class BaseScanner(ABC):
             pool=pool,
             data_collector=self._data,
             rpc=self._rpc,
+            deployer_store=self._deployer_store,
         )
+        bytecode = self._data.get_code(token.address) or ""
+        if bytecode:
+            from src.evm.dispatch_table import parse_dispatch_table
+            selectors, _ = parse_dispatch_table(bytecode)
+            ctx.dispatch_selectors = set(selectors.keys())
+            ctx.has_fallback = self._data.fallback_detected(token.address)
         findings: list[Finding] = []
         for check in self.checks:
             try:

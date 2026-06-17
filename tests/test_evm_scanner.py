@@ -66,7 +66,10 @@ def test_base_scanner_collects_findings():
         def checks(self):
             return [DummyCheck(), NullCheck()]
 
-    scanner = TestScanner(data_collector=Mock(), rpc=Mock())
+    data = Mock()
+    data.get_code.return_value = ""
+    data.fallback_detected.return_value = False
+    scanner = TestScanner(data_collector=data, rpc=Mock())
     token = TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM)
     pool = PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=1000)
     report = scanner.scan(token, pool)
@@ -96,7 +99,10 @@ def test_base_scanner_handles_check_error():
         def checks(self):
             return [BrokenCheck()]
 
-    scanner = TestScanner(data_collector=Mock(), rpc=Mock())
+    data = Mock()
+    data.get_code.return_value = ""
+    data.fallback_detected.return_value = False
+    scanner = TestScanner(data_collector=data, rpc=Mock())
     token = TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM)
     pool = PoolInfo(address="0xpool", dex="Uniswap", liquidity_usd=1000)
     report = scanner.scan(token, pool)
@@ -105,5 +111,8 @@ def test_base_scanner_handles_check_error():
 
 
 def test_evm_scanner_creates():
-    scanner = EvmScanner(data_collector=Mock(), rpc=Mock())
-    assert len(scanner.checks) == 13  # all EVM checks registered
+    data = Mock()
+    data.get_code.return_value = ""
+    data.fallback_detected.return_value = False
+    scanner = EvmScanner(data_collector=data, rpc=Mock())
+    assert len(scanner.checks) == 27  # external + deployer/risk + bytecode + cross-contract + historical + storage + sandwich
