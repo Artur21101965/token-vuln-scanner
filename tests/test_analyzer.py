@@ -1,7 +1,8 @@
+import tempfile
 import pytest
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock, patch
 from src.analyzer import Analyzer
-from src.types import TokenInfo, PoolInfo, Chain
+from src.types import TokenInfo, PoolInfo, Chain, ContractTarget
 
 
 @pytest.fixture
@@ -193,3 +194,59 @@ def test_analyzer_selects_solana_scanner():
     )
     analyzer.process_one()
     sol_scanner.scan.assert_called_once()
+
+
+def test_enqueue_blockscout_targets():
+    from src.analyzer import Analyzer
+
+    queue = Mock()
+    reporter = Mock()
+    scanner = Mock()
+
+    with tempfile.NamedTemporaryFile(suffix=".db") as tmp:
+        queue.db_path = tmp.name
+
+        analyzer = Analyzer(
+            queue=queue,
+            scanners={Chain.ETHEREUM: scanner},
+            reporter=reporter,
+        )
+
+        with patch("src.analyzer.BlockscoutRecentSource") as MockSource:
+            instance = MockSource.return_value
+            instance.fetch.return_value = [
+                ContractTarget(chain=Chain.ETHEREUM, address="0xabc", source="blockscout"),
+                ContractTarget(chain=Chain.BSC, address="0xdef", source="blockscout"),
+            ]
+
+            result = analyzer._enqueue_blockscout_targets()
+
+            instance.fetch.assert_called()
+            assert result > 0
+
+
+def test_process_contract_batch():
+    from src.analyzer import Analyzer
+
+    queue = Mock()
+    queue.db_path = ":memory:"
+    reporter = Mock()
+    scanner = Mock()
+    scanner.scan.return_value = MagicMock(findings=[])
+
+    analyzer = Analyzer(
+        queue=queue,
+        scanners={Chain.ETHEREUM: scanner},
+        reporter=reporter,
+    )
+
+    with patch("src.analyzer.ContractQueue") as MockCQ:
+        cq_instance = MockCQ.return_value
+        cq_instance.claim_next_batch.return_value = [
+            ContractTarget(chain=Chain.ETHEREUM, address="0xabc", source="blockscout"),
+        ]
+
+        result = analyzer.process_contract_batch()
+
+        cq_instance.claim_next_batch.assert_called_once()
+        assert result == 1

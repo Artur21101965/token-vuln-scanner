@@ -7,11 +7,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
-from src.db.queue import TokenQueue
+from src.db.queue import TokenQueue, ContractQueue
 from src.db.deployer_store import DeployerStore
 from src.scanners.base import BaseScanner
 from src.reporter.json_report import JsonReporter
-from src.types import Chain, TokenInfo, PoolInfo, Finding, Severity
+from src.types import Chain, TokenInfo, PoolInfo, Finding, Severity, ContractTarget
+from src.sources.blockscout import BlockscoutRecentSource
 from src.monitors.slot_monitor import SlotMonitor
 from src.monitors.top_token_scanner import TopTokenScanner
 from src.abi_resolver import AbiResolver
@@ -211,6 +212,66 @@ class Analyzer:
         except Exception as exc:
             logger.debug("Top token scan error: %s", exc)
 
+    def _enqueue_blockscout_targets(self) -> int:
+        contract_queue = ContractQueue(self._queue.db_path)
+        contract_queue.init_db()
+        total = 0
+        for chain in Chain:
+            if chain == Chain.SOLANA:
+                continue
+            source = BlockscoutRecentSource(max_pages=2)
+            targets = source.fetch(chain)
+            for t in targets:
+                contract_queue.add(chain=t.chain, address=t.address, source=t.source)
+                total += 1
+        if total:
+            logger.info("Blockscout: enqueued %d contract targets", total)
+        return total
+
+    def _scan_contract_target(self, target: ContractTarget, chain: Chain, scanner: BaseScanner) -> None:
+        token_info = TokenInfo(
+            address=target.address,
+            symbol=target.address[:10],
+            chain=chain,
+        )
+        pool_info = PoolInfo(
+            address="",
+            dex="direct",
+            liquidity_usd=Decimal("0"),
+        )
+        report = scanner.scan(token_info, pool_info)
+        self._reporter.write(report)
+        logger.info("Contract scan done %s — %s", target.address[:10], report.summary)
+
+    def process_contract_batch(self) -> int:
+        contract_queue = ContractQueue(self._queue.db_path)
+        contract_queue.init_db()
+        targets = contract_queue.claim_next_batch(self._max_workers)
+        if not targets:
+            return 0
+
+        with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+            fut_to_target = {}
+            for target in targets:
+                chain = target.chain
+                scanner = self._get_scanner(chain)
+                if scanner is None:
+                    contract_queue.mark_failed(target.row_id, error=f"No scanner for chain: {chain.name}")
+                    continue
+                fut = pool.submit(self._scan_contract_target, target, chain, scanner)
+                fut_to_target[fut] = target
+
+            for fut in as_completed(fut_to_target):
+                target = fut_to_target[fut]
+                try:
+                    fut.result()
+                    contract_queue.mark_done(target.row_id)
+                except Exception as exc:
+                    logger.error("Contract scan failed %s: %s", target.address[:10], exc)
+                    contract_queue.mark_failed(target.row_id, error=str(exc))
+
+        return len(targets)
+
     def process_one(self) -> bool:
         token = self._queue.claim_next()
         if token is None:
@@ -276,6 +337,8 @@ class Analyzer:
                         self._check_slot_changes()
                         self._rescan_old_tokens()
                         self._scan_top_tokens()
+                        self._enqueue_blockscout_targets()
+                        self.process_contract_batch()
                         idle_cycles = 0
                     time.sleep(interval)
             except KeyboardInterrupt:
