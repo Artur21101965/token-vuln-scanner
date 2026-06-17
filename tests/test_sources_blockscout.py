@@ -4,26 +4,6 @@ from src.sources.blockscout import BlockscoutRecentSource, BLOCKSCOUT_URLS
 from src.types import Chain
 
 
-@pytest.fixture
-def mock_response():
-    resp = MagicMock()
-    resp.status_code = 200
-    resp.json.return_value = {
-        "items": [
-            {
-                "address": {
-                    "hash": "0x1234567890123456789012345678901234567890"
-                }
-            },
-            {
-                "address": {
-                    "hash": "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd"
-                }
-            }
-        ]
-    }
-    return resp
-
 
 def test_blockscout_urls_defined():
     assert Chain.ETHEREUM in BLOCKSCOUT_URLS
@@ -41,6 +21,7 @@ def test_blockscout_urls_defined():
 @patch("src.sources.blockscout.httpx.Client")
 def test_blockscout_fetch_returns_targets(mock_client_class):
     mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
     mock_client_class.return_value = mock_client
     resp = MagicMock()
     resp.status_code = 200
@@ -58,12 +39,12 @@ def test_blockscout_fetch_returns_targets(mock_client_class):
     assert targets[0].address == "0x1234567890123456789012345678901234567890"
     assert targets[0].chain == Chain.ETHEREUM
     assert targets[0].source == "blockscout"
-    source.close()
 
 
 @patch("src.sources.blockscout.httpx.Client")
-def test_blockscout_fetch_skips_missing_hash(mock_client_class):
+def test_blockscout_fetch_skips_invalid_or_missing_hash(mock_client_class):
     mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
     mock_client_class.return_value = mock_client
     resp = MagicMock()
     resp.status_code = 200
@@ -76,12 +57,12 @@ def test_blockscout_fetch_skips_missing_hash(mock_client_class):
     targets = source.fetch(Chain.ETHEREUM)
     assert len(targets) == 1
     assert targets[0].address == "0xabc"
-    source.close()
 
 
 @patch("src.sources.blockscout.httpx.Client")
 def test_blockscout_fetch_handles_http_error(mock_client_class):
     mock_client = MagicMock()
+    mock_client.__enter__.return_value = mock_client
     mock_client_class.return_value = mock_client
     resp = MagicMock()
     resp.status_code = 500
@@ -90,7 +71,6 @@ def test_blockscout_fetch_handles_http_error(mock_client_class):
     source = BlockscoutRecentSource(max_pages=1)
     targets = source.fetch(Chain.ETHEREUM)
     assert len(targets) == 0
-    source.close()
 
 
 @patch("src.sources.blockscout.httpx.Client")
@@ -98,4 +78,3 @@ def test_blockscout_fetch_unknown_chain(mock_client_class):
     source = BlockscoutRecentSource()
     targets = source.fetch(Chain.SOLANA)
     assert len(targets) == 0
-    source.close()
