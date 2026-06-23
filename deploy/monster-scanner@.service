@@ -1,0 +1,22 @@
+# Monster Exploit Scanner — systemd юниты
+# Копировать в /etc/systemd/system/
+#
+# Каждый процесс = отдельный systemd юнит → авто-рестарт при падении
+
+[Unit]
+Description=Monster Scanner — %i цепь
+After=network.target
+
+[Service]
+Type=simple
+User=monster
+WorkingDirectory=/opt/monster-scanner
+Environment=PATH=/opt/monster-scanner/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/monster-scanner/.venv/bin/python monster_scanner.py %i --loop
+Restart=always
+RestartSec=30
+StandardOutput=append:/opt/monster-scanner/logs/monster_%i.log
+StandardError=append:/opt/monster-scanner/logs/monster_%i.log
+
+[Install]
+WantedBy=multi-user.target

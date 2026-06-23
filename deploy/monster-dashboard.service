@@ -1,0 +1,17 @@
+[Unit]
+Description=Monster Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=monster
+WorkingDirectory=/opt/monster-scanner
+Environment=PATH=/opt/monster-scanner/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/monster-scanner/.venv/bin/python run_dashboard.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/monster-scanner/logs/dashboard.log
+StandardError=append:/opt/monster-scanner/logs/dashboard.log
+
+[Install]
+WantedBy=multi-user.target

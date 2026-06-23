@@ -1,0 +1,17 @@
+[Unit]
+Description=Monster V4 Hook Hunter
+After=network.target
+
+[Service]
+Type=simple
+User=monster
+WorkingDirectory=/opt/monster-scanner
+Environment=PATH=/opt/monster-scanner/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/monster-scanner/.venv/bin/python v4_hook_hunter.py
+Restart=always
+RestartSec=30
+StandardOutput=append:/opt/monster-scanner/logs/v4_hook_hunter.log
+StandardError=append:/opt/monster-scanner/logs/v4_hook_hunter.log
+
+[Install]
+WantedBy=multi-user.target
