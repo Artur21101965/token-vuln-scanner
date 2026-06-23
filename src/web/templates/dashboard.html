@@ -2,327 +2,345 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Monster Exploit Scanner</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0d1117;color:#c9d1d9;padding:1rem}
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--text:#c9d1d9;--muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d2991d}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);padding:1rem}
 h1{font-size:1.2rem;color:#f0f6fc}
-h2{font-size:0.9rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem}
+h2{font-size:0.85rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem}
 .container{max-width:1400px;margin:0 auto}
-header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid #30363d}
+header{display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
 header .pulse{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-.tabs{display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid #30363d}
-.tab{padding:0.5rem 1rem;cursor:pointer;color:#8b949e;border-bottom:2px solid transparent;font-size:0.85rem;user-select:none}
-.tab:hover{color:#c9d1d9}
-.tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+header .ws-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+header .ws-dot.dead{background:var(--red)}
+.tabs{display:flex;gap:0;margin-bottom:0.75rem;border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab{padding:0.4rem 0.8rem;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-size:0.8rem;white-space:nowrap;user-select:none}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue)}
 .tab-content{display:none}
 .tab-content.active{display:block}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:0.75rem}
-.card{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:0.75rem}
-.stat{text-align:center;padding:0.5rem}
-.stat .num{font-size:1.5rem;font-weight:700}
-.stat .label{font-size:0.65rem;color:#8b949e;text-transform:uppercase}
-.stat.green .num{color:#3fb950}.stat.blue .num{color:#58a6ff}.stat.red .num{color:#f85149}
-.proc{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid #21262d}
-.proc .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.proc .dot.on{background:#3fb950}.proc .dot.off{background:#f85149}
-.proc .name{font-weight:500;font-size:0.85rem;min-width:160px}
-.proc .info{font-size:0.7rem;color:#8b949e;flex:1}
-.proc .count{font-size:0.7rem;color:#58a6ff}
-.proc .actions{display:flex;gap:0.3rem}
-.proc .actions button{background:#21262d;border:1px solid #30363d;color:#8b949e;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.65rem}
-.proc .actions button:hover{background:#30363d;color:#c9d1d9}
-.findings-list{max-height:400px;overflow-y:auto}
-.finding{padding:0.3rem 0.5rem;border-left:3px solid #30363d;margin:0.2rem 0;font-size:0.75rem;font-family:monospace}
-.finding.crit{border-left-color:#f85149}
-.finding .src{color:#8b949e;font-size:0.65rem}
-.gas{display:flex;gap:1rem;flex-wrap:wrap}
-.gas-item{background:#161b22;border:1px solid #30363d;border-radius:4px;padding:0.4rem 0.7rem;font-size:0.8rem}
-.gas-item.ok{color:#3fb950}.gas-item.low{color:#f85149}
-.layers{display:grid;grid-template-columns:repeat(4,1fr);gap:0.3rem}
-.layer{background:#161b22;border:1px solid #30363d;border-radius:4px;padding:0.4rem;font-size:0.7rem;text-align:center}
-.layer .ln{color:#58a6ff;font-weight:600}.layer .ld{color:#8b949e;font-size:0.65rem}
-.settings-form{display:flex;flex-direction:column;gap:0.5rem}
-.settings-form textarea{width:100%;min-height:400px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:0.75rem;font-family:monospace;font-size:0.8rem;resize:vertical}
-.settings-form .btns{display:flex;gap:0.5rem}
-.settings-form button{background:#238636;color:#fff;border:none;padding:0.5rem 1.5rem;border-radius:4px;cursor:pointer;font-size:0.85rem}
-.settings-form button:hover{background:#2ea043}
-.settings-form button.danger{background:#da3633}
-.settings-form button.danger:hover{background:#f85149}
-.settings-form .msg{padding:0.5rem;border-radius:4px;font-size:0.8rem}
-.settings-form .msg.ok{background:#1a3a2a;color:#3fb950}
-.settings-form .msg.err{background:#3a1a1a;color:#f85149}
-.ens-stats{display:flex;gap:0.5rem;margin-top:0.5rem}
-.ens-stats span{background:#1a2a3a;padding:0.2rem 0.5rem;border-radius:3px;font-size:0.7rem;color:#58a6ff}
-footer{text-align:center;color:#484f58;font-size:0.7rem;margin-top:1rem;padding-top:0.5rem;border-top:1px solid #30363d}
-.toast{position:fixed;bottom:1rem;right:1rem;background:#238636;color:#fff;padding:0.5rem 1rem;border-radius:4px;font-size:0.8rem;opacity:0;transition:opacity 0.3s;z-index:100}
-.toast.show{opacity:1}
-.toast.err{background:#da3633}
+.card{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:0.75rem}
+.stat{text-align:center;padding:0.4rem}
+.stat .num{font-size:1.4rem;font-weight:700}
+.stat .label{font-size:0.6rem;color:var(--muted);text-transform:uppercase}
+.stat.g .num{color:var(--green)}.stat.b .num{color:var(--blue)}
+.proc{display:flex;align-items:center;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid var(--border)}
+.proc .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.proc .dot.on{background:var(--green)}.proc .dot.off{background:var(--red)}
+.proc .name{font-weight:500;font-size:0.8rem;min-width:140px}
+.proc .info{font-size:0.65rem;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proc .count{font-size:0.65rem;color:var(--blue);min-width:25px}
+.proc .log-btn,.proc .restart-btn{background:var(--border);border:none;color:var(--muted);padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.6rem;margin-left:2px}
+.proc .log-btn:hover,.proc .restart-btn:hover{background:var(--blue);color:#fff}
+.findings-list{max-height:350px;overflow-y:auto}
+.finding{padding:0.25rem 0.5rem;border-left:3px solid var(--border);margin:0.15rem 0;font-size:0.7rem;font-family:monospace;word-break:break-all}
+.finding.crit{border-left-color:var(--red)}
+.finding .src{color:var(--muted);font-size:0.6rem}
+.gas{display:flex;gap:0.75rem;flex-wrap:wrap}
+.gas-item{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:0.35rem 0.6rem;font-size:0.75rem}
+.gas-item.ok{color:var(--green)}.gas-item.low{color:var(--red)}
+.search-box{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.4rem 0.6rem;border-radius:4px;font-size:0.8rem;margin-bottom:0.5rem}
+.search-box:focus{outline:none;border-color:var(--blue)}
+.settings-form textarea{width:100%;min-height:400px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:0.75rem;font-family:monospace;font-size:0.8rem;resize:vertical}
+.settings-form button{background:#238636;color:#fff;border:none;padding:0.5rem 1rem;border-radius:4px;cursor:pointer;font-size:0.8rem;margin-right:0.5rem}
+.settings-form button.danger{background:var(--red)}
+.log-viewer{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:0.5rem;font-family:monospace;font-size:0.7rem;max-height:400px;overflow-y:auto;white-space:pre-wrap;line-height:1.4;color:var(--text)}
+.log-header{display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem}
+.log-header select{background:var(--card);border:1px solid var(--border);color:var(--text);padding:0.3rem;border-radius:3px;font-size:0.8rem}
+.log-header button{background:var(--border);border:none;color:var(--text);padding:0.3rem 0.6rem;border-radius:3px;cursor:pointer;font-size:0.7rem}
+.log-header button:hover{background:var(--blue)}
+.pnl-box{text-align:center;padding:0.5rem}
+.pnl-box .delta{font-size:1.8rem;font-weight:700}
+.pnl-box .detail{font-size:0.65rem;color:var(--muted)}
+.pnl-box .sub{display:flex;justify-content:space-around;font-size:0.65rem;color:var(--muted);margin-top:0.4rem}
+canvas{width:100%;height:60px;margin-top:0.3rem}
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center}
+.modal.show{display:flex}
+.modal .box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem;max-width:700px;width:90%;max-height:80vh;overflow-y:auto}
+.modal .close{float:right;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer}
+.toast{position:fixed;bottom:1rem;right:1rem;background:var(--green);color:#fff;padding:0.5rem 1rem;border-radius:4px;font-size:0.8rem;opacity:0;transition:opacity 0.3s;z-index:200}
+.toast.show{opacity:1}.toast.err{background:var(--red)}
+footer{text-align:center;color:#484f58;font-size:0.65rem;margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--border)}
+@media(max-width:768px){
+  body{padding:0.5rem}
+  .grid4{grid-template-columns:repeat(2,1fr)}
+  .grid2{grid-template-columns:1fr}
+  .proc .name{min-width:100px;font-size:0.7rem}
+  .proc .info{display:none}
+  h1{font-size:1rem}
+}
 </style>
 </head>
 <body>
 <div class="container">
 <header>
-  <h1>🦖 Monster Exploit Scanner</h1>
-  <span style="font-size:0.7rem;color:#8b949e" id="proc-count">{{ stats.processes_alive }}/{{ stats.processes_total }} процессов</span>
-  <span class="pulse" style="color:#3fb950;font-size:0.7rem;margin-left:auto">● онлайн</span>
+  <h1>🦖 Monster</h1>
+  <span style="font-size:0.65rem;color:var(--muted)" id="proc-count">—</span>
+  <span class="ws-dot" id="ws-dot" title="WebSocket"></span>
+  <span style="font-size:0.65rem;color:var(--muted);margin-left:auto" id="pnl-header">—</span>
 </header>
 
 <div class="tabs">
   <div class="tab active" data-tab="overview" onclick="switchTab('overview')">📊 Обзор</div>
   <div class="tab" data-tab="processes" onclick="switchTab('processes')">⚙️ Процессы</div>
   <div class="tab" data-tab="findings" onclick="switchTab('findings')">🔍 Находки</div>
+  <div class="tab" data-tab="logs" onclick="switchTab('logs')">📜 Логи</div>
   <div class="tab" data-tab="settings" onclick="switchTab('settings')">🔧 Настройки</div>
 </div>
 
-<!-- OVERVIEW -->
 <div id="overview" class="tab-content active">
-  <div class="grid4">
-    <div class="stat green"><div class="num" id="s-procs">{{ stats.processes_alive }}</div><div class="label">Процессов</div></div>
-    <div class="stat blue"><div class="num" id="s-findings">{{ stats.findings_db + stats.findings_txt }}</div><div class="label">Находок</div></div>
-    <div class="stat blue"><div class="num" id="s-keys">{{ stats.keys_monitored }}</div><div class="label">Ключей</div></div>
-    <div class="stat blue"><div class="num">{{ stats.contracts_total }}</div><div class="label">Контрактов в БД</div></div>
+  <div class="grid4" id="stats-grid">
+    <div class="stat g"><div class="num" id="s-procs">—</div><div class="label">Процессов</div></div>
+    <div class="stat b"><div class="num" id="s-findings">—</div><div class="label">Находок</div></div>
+    <div class="stat b"><div class="num" id="s-keys">—</div><div class="label">Ключей</div></div>
+    <div class="stat b"><div class="num" id="s-contracts">—</div><div class="label">Контрактов</div></div>
   </div>
-
   <div class="grid2">
     <div class="card">
       <h2>💵 PNL</h2>
-      <div style="text-align:center;padding:0.5rem">
-        <div id="pnl-delta" style="font-size:1.8rem;font-weight:700;color:#3fb950">загрузка...</div>
-        <div style="font-size:0.7rem;color:#8b949e" id="pnl-detail"></div>
+      <div class="pnl-box">
+        <div class="delta" id="pnl-delta" style="color:var(--green)">$0.00</div>
+        <div class="detail" id="pnl-detail">—</div>
+        <canvas id="pnl-chart"></canvas>
       </div>
-      <div style="display:flex;justify-content:space-around;font-size:0.7rem;color:#8b949e;margin-top:0.5rem">
-        <span>⛽ Газ: <b id="pnl-gas">—</b></span>
-        <span>💰 Дрейн: <b id="pnl-drain">—</b></span>
-        <span>⚡ Flash: <b id="pnl-flash">—</b></span>
+      <div class="pnl-box sub" id="pnl-sub">
+        <span>⛽ Газ: <b id="pnl-gas">$0</b></span>
+        <span>⚡ Flash: <b id="pnl-flash">0</b></span>
       </div>
     </div>
     <div class="card">
-      <h2>⛽ Газ</h2>
-      <div class="gas" id="gas-block">
-      {% for g in gas %}
-        <div class="gas-item {{ 'ok' if g.ok else 'low' }}">{{ g.chain }}: {{ g.balance }}</div>
-      {% endfor %}
+      <h2>⛽ Баланс</h2>
+      <div class="gas" id="gas-block">{% for g in gas %}<div class="gas-item {{'ok' if g.ok else 'low'}}">{{g.chain}}: {{g.balance}}</div>{% endfor %}</div>
+      <div style="margin-top:0.5rem;font-size:0.65rem;color:var(--muted)">
+        ENS: <b id="ens-count">{{stats.ens_expiring}}</b> | Ключей: <b id="keys-count">{{stats.keys_monitored}}</b>
       </div>
     </div>
   </div>
-
-  <div class="card" style="margin-top:0.75rem">
-    <h2>📡 ENS / V4 / Вестинг</h2>
-    <div class="ens-stats" id="ens-block">
-      <span>ENS: {{ stats.ens_expiring }} истекающих</span>
-      <span>V4: ожидание запуска</span>
-      <span>Ключей: {{ stats.keys_monitored }}</span>
-    </div>
-  </div>
 </div>
 
-<!-- PROCESSES -->
-<div id="processes" class="tab-content">
-  <div id="proc-list">
-  {% for p in processes %}
-  <div class="proc" title="{{ p.desc_long }}">
-    <div class="dot {{ 'on' if p.alive else 'off' }}"></div>
-    <div class="name">{{ p.name }}</div>
-    <div class="info">{{ p.desc_short }}
-      {% if p.alive and p.instances %}
-        {% for inst in p.instances[:3] %}
-          <span style="color:#58a6ff">| {{ inst.chain }}</span>
-        {% endfor %}
-      {% endif %}
-    </div>
-    <div class="count">{% if p.alive %}×{{ p.count }}{% else %}—{% endif %}</div>
-    <div class="actions">
-      <button onclick="restartProc('{{ p.script }}')" title="Перезапустить">↻</button>
-    </div>
-  </div>
-  {% endfor %}
-  </div>
-</div>
+<div id="processes" class="tab-content"><div id="proc-list"></div></div>
 
-<!-- FINDINGS -->
 <div id="findings" class="tab-content">
   <div class="card">
-    <h2>📋 Последние находки <span style="font-size:0.65rem;color:#484f58" id="findings-count"></span></h2>
-    <div class="findings-list" id="findings-list">
-      {% if findings %}
-        {% for f in findings %}
-        <div class="finding {{ 'crit' if 'CRITICAL' in f.text else '' }}">
-          <span class="src">[{{ f.source }}]</span> {{ f.text }}
-          {% if f.verdict %}<div style="color:#d2991d;font-size:0.7rem;margin-top:2px">📋 {{ f.verdict }}</div>{% endif %}
-        </div>
-        {% endfor %}
-      {% else %}
-        <div style="color:#484f58;padding:1rem;text-align:center">Пока ничего. Система ищет...</div>
-      {% endif %}
-    </div>
+    <input class="search-box" id="findings-search" placeholder="🔍 Поиск по находкам..." oninput="renderFindings()">
+    <div class="findings-list" id="findings-list"></div>
   </div>
 </div>
 
-<!-- SETTINGS -->
+<div id="logs" class="tab-content">
+  <div class="card">
+    <div class="log-header">
+      <select id="log-select" onchange="loadLog()">
+        <option value="">Выбери процесс...</option>
+      </select>
+      <button onclick="loadLog()">🔄 Обновить</button>
+      <span style="font-size:0.65rem;color:var(--muted)">авто каждые 3с</span>
+    </div>
+    <div class="log-viewer" id="log-output">Выбери процесс слева ↑</div>
+  </div>
+</div>
+
 <div id="settings" class="tab-content">
   <div class="card">
     <h2>🔧 config.toml</h2>
     <div class="settings-form">
-      <textarea id="config-editor">{{ config_raw }}</textarea>
-      <div class="btns">
-        <button onclick="saveConfig()">💾 Сохранить</button>
-        <button class="danger" onclick="loadConfig()">↻ Сбросить</button>
-        <span id="config-msg"></span>
-      </div>
+      <textarea id="config-editor">{{config_raw}}</textarea>
+      <button onclick="saveConfig()">💾 Сохранить</button>
+      <button class="danger" onclick="loadConfig()">↻ Сбросить</button>
+      <span id="config-msg" style="font-size:0.8rem;margin-left:0.5rem"></span>
     </div>
   </div>
 </div>
 
-<footer>
-  Monster Exploit Scanner | {{ now }} | http://localhost:8000 | <span id="live-status">● live</span>
-</footer>
+<footer>Monster Exploit Scanner | <span id="live-status">● connecting...</span></footer>
 </div>
 
+<div class="modal" id="log-modal"><div class="box"><button class="close" onclick="closeModal()">✕</button><div class="log-viewer" id="modal-log" style="max-height:65vh"></div></div></div>
 <div id="toast" class="toast"></div>
 
 <script>
-let liveTimer = null;
+const WS_URL = `ws://${location.host}/ws`;
+let ws, findingsData = [], pnlHistory = [];
+const MAX_PNL_HIST = 60;
 
 function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
   document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
   document.getElementById(name).classList.add('active');
-  if (name === 'settings') loadConfig();
-  if (name === 'findings') refreshFindings();
+  if(name==='settings') loadConfig();
+  if(name==='logs') loadLog();
 }
 
-function toast(msg, err) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (err ? ' err' : '');
-  setTimeout(() => t.classList.remove('show'), 2500);
+function toast(msg,err){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' err':'');setTimeout(()=>t.classList.remove('show'),2500)}
+
+// === WEBSOCKET ===
+function connectWS(){
+  ws = new WebSocket(WS_URL);
+  ws.onopen = ()=>{
+    document.getElementById('ws-dot').classList.remove('dead');
+    document.getElementById('live-status').textContent = '● live (WS)';
+  };
+  ws.onclose = ()=>{
+    document.getElementById('ws-dot').classList.add('dead');
+    document.getElementById('live-status').textContent = '● reconnecting...';
+    setTimeout(connectWS, 2000);
+  };
+  ws.onmessage = (e)=>{
+    try{
+      const d = JSON.parse(e.data);
+      if(d.type==='live'){
+        updateStats(d.stats);
+        updateProcesses(d.processes);
+        findingsData = d.findings||[];
+        if(document.querySelector('#findings.tab-content.active')) renderFindings();
+        updateGas(d.gas);
+        updatePNL(d.pnl);
+      }
+    }catch(ex){}
+  };
+}
+connectWS();
+
+function updateStats(s){
+  if(!s)return;
+  document.getElementById('s-procs').textContent = s.processes_alive;
+  document.getElementById('s-findings').textContent = (s.findings_db||0)+(s.findings_txt||0);
+  document.getElementById('s-keys').textContent = s.keys_monitored;
+  document.getElementById('s-contracts').textContent = s.contracts_total;
+  document.getElementById('proc-count').textContent = (s.processes_alive||0)+'/'+(s.processes_total||0)+' процессов';
 }
 
-// ---- Live refresh ----
-async function refreshStats() {
-  try {
-    const r = await fetch('/api/stats');
-    const s = await r.json();
-    document.getElementById('s-procs').textContent = s.processes_alive;
-    document.getElementById('s-findings').textContent = s.findings_db + s.findings_txt;
-    document.getElementById('s-keys').textContent = s.keys_monitored;
-    document.getElementById('proc-count').textContent = s.processes_alive + '/' + s.processes_total;
-  } catch(e) {}
-  refreshPNL();
+function updateProcesses(procs){
+  if(!procs)return;
+  const list = document.getElementById('proc-list');
+  const logSel = document.getElementById('log-select');
+  list.innerHTML = procs.map(p=>{
+    const chains = (p.instances||[]).slice(0,3).map(i=>`<span style="color:var(--blue)">| ${i.chain}</span>`).join('');
+    return `<div class="proc"><div class="dot ${p.alive?'on':'off'}"></div>
+      <div class="name">${p.name}</div>
+      <div class="info">${p.desc||''} ${chains}</div>
+      <div class="count">${p.alive?'×'+p.count:'—'}</div>
+      <button class="log-btn" onclick="openLog('${p.script||''}')" title="Лог">📜</button>
+      <button class="restart-btn" onclick="restartProc('${p.script||''}')">↻</button></div>`;
+  }).join('');
+  // populate log select
+  if(logSel.options.length<=1){
+    let scripts = [...new Set(procs.map(p=>p.script).filter(Boolean))];
+    scripts.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;logSel.appendChild(o)});
+  }
 }
 
-async function refreshPNL() {
-  try {
-    const r = await fetch('/api/pnl');
-    const p = await r.json();
-    if (p.error) return;
-    const d = document.getElementById('pnl-delta');
-    const sign = p.delta_usd >= 0 ? '+' : '';
-    d.textContent = sign + '$' + p.delta_usd.toFixed(2);
-    d.style.color = p.is_profitable ? '#3fb950' : '#f85149';
-    document.getElementById('pnl-detail').textContent =
-      'Старт: $' + p.start_usd.toFixed(2) + ' | Сейчас: $' + p.current_usd.toFixed(2);
-    document.getElementById('pnl-gas').textContent = '$' + p.gas_total.toFixed(4);
-    document.getElementById('pnl-drain').textContent = '$' + p.drained_total.toFixed(2);
-    document.getElementById('pnl-flash').textContent = p.flash_attempts + ' попыток';
-  } catch(e) {}
+function renderFindings(){
+  const q = (document.getElementById('findings-search')?.value||'').toLowerCase();
+  let items = findingsData;
+  if(q) items = items.filter(f=>(f.text||'').toLowerCase().includes(q)||(f.source||'').toLowerCase().includes(q));
+  const list = document.getElementById('findings-list');
+  if(!items.length){list.innerHTML='<div style="color:#484f58;padding:1rem;text-align:center">Ничего не найдено</div>';return}
+  list.innerHTML = items.map(f=>{
+    const cls = (f.text||'').includes('CRITICAL')?' crit':'';
+    return `<div class="finding${cls}"><span class="src">[${f.source||''}]</span> ${f.text||''}</div>`;
+  }).join('');
 }
 
-async function refreshProcesses() {
-  try {
-    const r = await fetch('/api/processes');
-    const procs = await r.json();
-    const list = document.getElementById('proc-list');
-    if (!list) return;
-    list.innerHTML = procs.map(p => {
-      const chains = p.instances ? p.instances.slice(0,3).map(i => 
-        `<span style="color:#58a6ff">| ${i.chain}</span>`
-      ).join('') : '';
-      return `<div class="proc" title="${p.desc || ''}">
-        <div class="dot ${p.alive ? 'on' : 'off'}"></div>
-        <div class="name">${p.name}</div>
-        <div class="info">${p.desc || ''} ${chains}</div>
-        <div class="count">${p.alive ? '×'+p.count : '—'}</div>
-        <div class="actions"><button onclick="restartProc('${p.script || ''}')" title="Перезапустить">↻</button></div>
-      </div>`;
-    }).join('');
-  } catch(e) {}
+function updateGas(gas){
+  if(!gas)return;
+  document.getElementById('gas-block').innerHTML = gas.map(g=>
+    `<div class="gas-item ${g.ok?'ok':'low'}">${g.chain}: ${g.balance}</div>`
+  ).join('');
 }
 
-async function refreshFindings() {
-  try {
-    const r = await fetch('/api/findings?n=20');
-    const findings = await r.json();
-    const list = document.getElementById('findings-list');
-    const cnt = document.getElementById('findings-count');
-    if (cnt) cnt.textContent = '(' + findings.length + ')';
-    if (!list) return;
-    if (!findings.length) {
-      list.innerHTML = '<div style="color:#484f58;padding:1rem;text-align:center">Пока ничего. Система ищет...</div>';
-      return;
-    }
-    list.innerHTML = findings.map(f => {
-      const cls = f.text && f.text.includes('CRITICAL') ? ' crit' : '';
-      const verdict = f.verdict ? `<div style="color:#d2991d;font-size:0.7rem;margin-top:2px">📋 ${f.verdict}</div>` : '';
-      return `<div class="finding${cls}"><span class="src">[${f.source}]</span> ${f.text}${verdict}</div>`;
-    }).join('');
-  } catch(e) {}
+function updatePNL(pnl){
+  if(!pnl||pnl.error)return;
+  const d = document.getElementById('pnl-delta');
+  const sign = (pnl.delta_usd||0)>=0?'+':'';
+  d.textContent = sign+'$'+(pnl.delta_usd||0).toFixed(2);
+  d.style.color = pnl.is_profitable?'var(--green)':'var(--red)';
+  document.getElementById('pnl-detail').textContent = 'Старт: $'+(pnl.start_usd||0).toFixed(2)+' | Сейчас: $'+(pnl.current_usd||0).toFixed(2);
+  document.getElementById('pnl-gas').textContent = '$'+(pnl.gas_total||0).toFixed(4);
+  document.getElementById('pnl-flash').textContent = (pnl.flash_attempts||0)+' попыток';
+  document.getElementById('pnl-header').textContent = '$'+(pnl.current_usd||0).toFixed(2);
+  // PNL chart
+  pnlHistory.push(pnl.current_usd||0);
+  if(pnlHistory.length>MAX_PNL_HIST) pnlHistory.shift();
+  drawPNLChart();
 }
 
-function startLive() {
-  liveTimer = setInterval(() => {
-    refreshStats();
-    refreshProcesses();
-    const activeTab = document.querySelector('.tab-content.active');
-    if (activeTab && activeTab.id === 'findings') refreshFindings();
-  }, 30000);
-  document.getElementById('live-status').textContent = '● live (30s)';
+function drawPNLChart(){
+  const canvas = document.getElementById('pnl-chart');
+  if(!canvas)return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = canvas.offsetWidth;
+  const H = canvas.height = 60;
+  if(pnlHistory.length<2)return;
+  const min = Math.min(...pnlHistory)*0.999;
+  const max = Math.max(...pnlHistory)*1.001;
+  const range = max-min||1;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle = '#3fb950';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  pnlHistory.forEach((v,i)=>{
+    const x = (i/(pnlHistory.length-1))*W;
+    const y = H-((v-min)/range)*H;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // fill
+  ctx.lineTo(W,H);ctx.lineTo(0,H);ctx.closePath();
+  ctx.fillStyle = 'rgba(63,185,80,0.08)';
+  ctx.fill();
 }
 
-// ---- Process restart ----
-async function restartProc(script) {
-  if (!script) return;
-  if (!confirm('Перезапустить ' + script + '?')) return;
-  try {
-    const form = new FormData();
-    form.append('script', script);
-    const r = await fetch('/api/process/restart', {method:'POST', body: form});
+// === PROCESS RESTART ===
+async function restartProc(script){
+  if(!script||!confirm('Перезапустить '+script+'?'))return;
+  try{
+    const f=new FormData();f.append('script',script);
+    const r=await fetch('/api/process/restart',{method:'POST',body:f});
+    const d=await r.json();toast(d.message,!d.ok);
+  }catch(e){toast('Ошибка: '+e,true)}
+}
+
+// === LOGS ===
+async function loadLog(){
+  const sel = document.getElementById('log-select');
+  const script = sel.value;
+  if(!script)return;
+  try{
+    const r = await fetch('/api/logs/'+script+'?lines=100');
     const d = await r.json();
-    toast(d.message, !d.ok);
-    setTimeout(refreshProcesses, 2000);
-  } catch(e) { toast('Ошибка: ' + e, true); }
+    document.getElementById('log-output').textContent = d.log||'[пусто]';
+  }catch(e){}
 }
-
-// ---- Settings ----
-async function loadConfig() {
-  try {
-    const r = await fetch('/api/config');
-    const c = await r.json();
-    const editor = document.getElementById('config-editor');
-    if (editor && c.raw) editor.value = c.raw;
-  } catch(e) {}
-}
-
-async function saveConfig() {
-  const editor = document.getElementById('config-editor');
-  if (!editor) return;
-  try {
-    const form = new FormData();
-    form.append('raw', editor.value);
-    const r = await fetch('/api/config/save', {method:'POST', body: form});
+async function openLog(script){
+  const modal = document.getElementById('log-modal');
+  document.getElementById('modal-log').textContent = 'Загрузка...';
+  modal.classList.add('show');
+  try{
+    const r = await fetch('/api/logs/'+script+'?lines=200');
     const d = await r.json();
-    const msg = document.getElementById('config-msg');
-    msg.textContent = d.message;
-    msg.className = 'msg ' + (d.ok ? 'ok' : 'err');
-    toast(d.message, !d.ok);
-  } catch(e) { toast('Ошибка: ' + e, true); }
+    document.getElementById('modal-log').textContent = d.log||'[пусто]';
+  }catch(e){document.getElementById('modal-log').textContent='Ошибка: '+e}
+}
+function closeModal(){document.getElementById('log-modal').classList.remove('show')}
+setInterval(()=>{if(document.querySelector('#logs.tab-content.active'))loadLog()},3000);
+
+// === SETTINGS ===
+async function loadConfig(){
+  try{const r=await fetch('/api/config');const d=await r.json();document.getElementById('config-editor').value=d.raw||''}catch(e){}
+}
+async function saveConfig(){
+  const ed=document.getElementById('config-editor');
+  try{const f=new FormData();f.append('raw',ed.value);const r=await fetch('/api/config/save',{method:'POST',body:f});const d=await r.json();toast(d.message,!d.ok)}catch(e){toast('Ошибка: '+e,true)}
 }
 
-startLive();
+// === CLICK-AWAY MODAL ===
+document.getElementById('log-modal').addEventListener('click',function(e){if(e.target===this)closeModal()});
 </script>
 </body>
 </html>
