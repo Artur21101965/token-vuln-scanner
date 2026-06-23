@@ -151,7 +151,7 @@ def find_lockers(chain_key: str, rpc: RpcClient, max_per_factory: int = 100):
         else:
             try:
                 current = rpc.get_block_number()
-                from_block = max(0, current - 500000)
+                from_block = max(0, current - 200000)  # ~1 месяц
                 logs = rpc.get_logs(hex(from_block), hex(current), factory_addr, ["0x" + event_topic])
                 child_addrs = []
                 seen = set()
@@ -209,10 +209,14 @@ def main():
     with open("config.toml", "rb") as f:
         config = tomllib.load(f)
 
-    rpc_url = config["rpc"].get(chain_key, "")
-    if not rpc_url:
+    rpc_raw = config["rpc"].get(chain_key, "")
+    if not rpc_raw:
         print(f"No RPC for {chain_key}")
         return
+
+    # Поддержка множественных URL через запятую
+    rpc_urls = [u.strip() for u in rpc_raw.split(",") if u.strip()]
+    rpc_url = rpc_urls[0]
 
     rpc = RpcClient(rpc_url, max_retries=5)
 
@@ -237,4 +241,27 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import traceback, os
+    restart_delays = [10, 30, 60, 120, 300]
+    crashes = 0
+    while True:
+        try:
+            main()
+        except KeyboardInterrupt:
+            logger.info("Остановлен")
+            break
+        except SystemExit:
+            break
+        except Exception as e:
+            crashes += 1
+            delay = restart_delays[min(crashes - 1, len(restart_delays) - 1)]
+            logger.error("Крах #%d: %s. Перезапуск через %ds...", crashes, e, delay)
+            ts = time.strftime("%Y-%m-%d %H:%M:%S")
+            os.makedirs("logs", exist_ok=True)
+            with open("logs/launchpad_vulture_crash.log", "a") as f:
+                f.write(f"[{ts}] Crash #{crashes}: {e}\n{traceback.format_exc()}\n\n")
+            time.sleep(delay)
+        else:
+            crashes = 0
+            logger.info("Скан завершён. Следующий через 1 час...")
+            time.sleep(3600)

@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="refresh" content="60">
 <title>Monster Exploit Scanner</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -14,7 +13,7 @@ h2{font-size:0.9rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.05em
 header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid #30363d}
 header .pulse{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 .tabs{display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid #30363d}
-.tab{padding:0.5rem 1rem;cursor:pointer;color:#8b949e;border-bottom:2px solid transparent;font-size:0.85rem}
+.tab{padding:0.5rem 1rem;cursor:pointer;color:#8b949e;border-bottom:2px solid transparent;font-size:0.85rem;user-select:none}
 .tab:hover{color:#c9d1d9}
 .tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
 .tab-content{display:none}
@@ -27,11 +26,14 @@ header .pulse{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%
 .stat .label{font-size:0.65rem;color:#8b949e;text-transform:uppercase}
 .stat.green .num{color:#3fb950}.stat.blue .num{color:#58a6ff}.stat.red .num{color:#f85149}
 .proc{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid #21262d}
-.proc .dot{width:8px;height:8px;border-radius:50%}
+.proc .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .proc .dot.on{background:#3fb950}.proc .dot.off{background:#f85149}
 .proc .name{font-weight:500;font-size:0.85rem;min-width:160px}
 .proc .info{font-size:0.7rem;color:#8b949e;flex:1}
 .proc .count{font-size:0.7rem;color:#58a6ff}
+.proc .actions{display:flex;gap:0.3rem}
+.proc .actions button{background:#21262d;border:1px solid #30363d;color:#8b949e;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.65rem}
+.proc .actions button:hover{background:#30363d;color:#c9d1d9}
 .findings-list{max-height:400px;overflow-y:auto}
 .finding{padding:0.3rem 0.5rem;border-left:3px solid #30363d;margin:0.2rem 0;font-size:0.75rem;font-family:monospace}
 .finding.crit{border-left-color:#f85149}
@@ -42,22 +44,29 @@ header .pulse{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%
 .layers{display:grid;grid-template-columns:repeat(4,1fr);gap:0.3rem}
 .layer{background:#161b22;border:1px solid #30363d;border-radius:4px;padding:0.4rem;font-size:0.7rem;text-align:center}
 .layer .ln{color:#58a6ff;font-weight:600}.layer .ld{color:#8b949e;font-size:0.65rem}
+.settings-form{display:flex;flex-direction:column;gap:0.5rem}
+.settings-form textarea{width:100%;min-height:400px;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:4px;padding:0.75rem;font-family:monospace;font-size:0.8rem;resize:vertical}
+.settings-form .btns{display:flex;gap:0.5rem}
+.settings-form button{background:#238636;color:#fff;border:none;padding:0.5rem 1.5rem;border-radius:4px;cursor:pointer;font-size:0.85rem}
+.settings-form button:hover{background:#2ea043}
+.settings-form button.danger{background:#da3633}
+.settings-form button.danger:hover{background:#f85149}
+.settings-form .msg{padding:0.5rem;border-radius:4px;font-size:0.8rem}
+.settings-form .msg.ok{background:#1a3a2a;color:#3fb950}
+.settings-form .msg.err{background:#3a1a1a;color:#f85149}
+.ens-stats{display:flex;gap:0.5rem;margin-top:0.5rem}
+.ens-stats span{background:#1a2a3a;padding:0.2rem 0.5rem;border-radius:3px;font-size:0.7rem;color:#58a6ff}
 footer{text-align:center;color:#484f58;font-size:0.7rem;margin-top:1rem;padding-top:0.5rem;border-top:1px solid #30363d}
+.toast{position:fixed;bottom:1rem;right:1rem;background:#238636;color:#fff;padding:0.5rem 1rem;border-radius:4px;font-size:0.8rem;opacity:0;transition:opacity 0.3s;z-index:100}
+.toast.show{opacity:1}
+.toast.err{background:#da3633}
 </style>
-<script>
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
-  document.getElementById(name).classList.add('active');
-}
-</script>
 </head>
 <body>
 <div class="container">
 <header>
   <h1>🦖 Monster Exploit Scanner</h1>
-  <span style="font-size:0.7rem;color:#8b949e">{{ stats.processes_alive }}/{{ stats.processes_total }} процессов</span>
+  <span style="font-size:0.7rem;color:#8b949e" id="proc-count">{{ stats.processes_alive }}/{{ stats.processes_total }} процессов</span>
   <span class="pulse" style="color:#3fb950;font-size:0.7rem;margin-left:auto">● онлайн</span>
 </header>
 
@@ -65,30 +74,34 @@ function switchTab(name) {
   <div class="tab active" data-tab="overview" onclick="switchTab('overview')">📊 Обзор</div>
   <div class="tab" data-tab="processes" onclick="switchTab('processes')">⚙️ Процессы</div>
   <div class="tab" data-tab="findings" onclick="switchTab('findings')">🔍 Находки</div>
+  <div class="tab" data-tab="settings" onclick="switchTab('settings')">🔧 Настройки</div>
 </div>
 
-<!-- OVERVIEW TAB -->
+<!-- OVERVIEW -->
 <div id="overview" class="tab-content active">
   <div class="grid4">
-    <div class="stat green"><div class="num">{{ stats.processes_alive }}</div><div class="label">Процессов</div></div>
-    <div class="stat blue"><div class="num">{{ stats.findings_db + stats.findings_txt }}</div><div class="label">Находок</div></div>
-    <div class="stat blue"><div class="num">{{ stats.keys_monitored }}</div><div class="label">Ключей</div></div>
-    <div class="stat blue"><div class="num">{{ stats.contracts_fuzzed }}</div><div class="label">Фаззинг</div></div>
+    <div class="stat green"><div class="num" id="s-procs">{{ stats.processes_alive }}</div><div class="label">Процессов</div></div>
+    <div class="stat blue"><div class="num" id="s-findings">{{ stats.findings_db + stats.findings_txt }}</div><div class="label">Находок</div></div>
+    <div class="stat blue"><div class="num" id="s-keys">{{ stats.keys_monitored }}</div><div class="label">Ключей</div></div>
+    <div class="stat blue"><div class="num">{{ stats.contracts_total }}</div><div class="label">Контрактов в БД</div></div>
   </div>
 
   <div class="grid2">
     <div class="card">
       <h2>⛽ Газ</h2>
-      <div class="gas">
+      <div class="gas" id="gas-block">
       {% for g in gas %}
         <div class="gas-item {{ 'ok' if g.ok else 'low' }}">{{ g.chain }}: {{ g.balance }}</div>
       {% endfor %}
       </div>
     </div>
     <div class="card">
-      <h2>🔑 Ключи в мониторинге</h2>
-      <div class="stat blue"><div class="num">{{ stats.keys_monitored }}</div></div>
-      <div style="font-size:0.7rem;color:#8b949e">Проверяются каждые 30 мин на 7 цепях</div>
+      <h2>📡 ENS / V4 / Вестинг</h2>
+      <div class="ens-stats" id="ens-block">
+        <span>ENS: {{ stats.ens_expiring }} истекающих</span>
+        <span>V4: ожидание</span>
+        <span>Вестинг: сканирует</span>
+      </div>
     </div>
   </div>
 
@@ -107,8 +120,9 @@ function switchTab(name) {
   </div>
 </div>
 
-<!-- PROCESSES TAB -->
+<!-- PROCESSES -->
 <div id="processes" class="tab-content">
+  <div id="proc-list">
   {% for p in processes %}
   <div class="proc" title="{{ p.desc_long }}">
     <div class="dot {{ 'on' if p.alive else 'off' }}"></div>
@@ -121,32 +135,177 @@ function switchTab(name) {
       {% endif %}
     </div>
     <div class="count">{% if p.alive %}×{{ p.count }}{% else %}—{% endif %}</div>
+    <div class="actions">
+      <button onclick="restartProc('{{ p.script }}')" title="Перезапустить">↻</button>
+    </div>
   </div>
   {% endfor %}
+  </div>
 </div>
 
-<!-- FINDINGS TAB -->
+<!-- FINDINGS -->
 <div id="findings" class="tab-content">
   <div class="card">
-    <h2>📋 Последние находки ({{ findings|length }})</h2>
-    <div class="findings-list">
-    {% if findings %}
-      {% for f in findings %}
-      <div class="finding {{ 'crit' if 'CRITICAL' in f.text else '' }}">
-        <span class="src">[{{ f.source }}]</span> {{ f.text }}
-        {% if f.verdict %}<div style="color:#d2991d;font-size:0.7rem;margin-top:2px">📋 Вердикт: {{ f.verdict }}</div>{% endif %}
+    <h2>📋 Последние находки <span style="font-size:0.65rem;color:#484f58" id="findings-count"></span></h2>
+    <div class="findings-list" id="findings-list">
+      {% if findings %}
+        {% for f in findings %}
+        <div class="finding {{ 'crit' if 'CRITICAL' in f.text else '' }}">
+          <span class="src">[{{ f.source }}]</span> {{ f.text }}
+          {% if f.verdict %}<div style="color:#d2991d;font-size:0.7rem;margin-top:2px">📋 {{ f.verdict }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <div style="color:#484f58;padding:1rem;text-align:center">Пока ничего. Система ищет...</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="tab-content">
+  <div class="card">
+    <h2>🔧 config.toml</h2>
+    <div class="settings-form">
+      <textarea id="config-editor">{{ config_raw }}</textarea>
+      <div class="btns">
+        <button onclick="saveConfig()">💾 Сохранить</button>
+        <button class="danger" onclick="loadConfig()">↻ Сбросить</button>
+        <span id="config-msg"></span>
       </div>
-      {% endfor %}
-    {% else %}
-      <div style="color:#484f58;padding:1rem;text-align:center">Пока ничего. Система ищет...</div>
-    {% endif %}
     </div>
   </div>
 </div>
 
 <footer>
-  Monster Exploit Scanner | Дашборд | {{ now }} | Автообновление 60с | http://localhost:8000
+  Monster Exploit Scanner | {{ now }} | http://localhost:8000 | <span id="live-status">● live</span>
 </footer>
 </div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let liveTimer = null;
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(name).classList.add('active');
+  if (name === 'settings') loadConfig();
+  if (name === 'findings') refreshFindings();
+}
+
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (err ? ' err' : '');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ---- Live refresh ----
+async function refreshStats() {
+  try {
+    const r = await fetch('/api/stats');
+    const s = await r.json();
+    document.getElementById('s-procs').textContent = s.processes_alive;
+    document.getElementById('s-findings').textContent = s.findings_db + s.findings_txt;
+    document.getElementById('s-keys').textContent = s.keys_monitored;
+    document.getElementById('proc-count').textContent = s.processes_alive + '/' + s.processes_total;
+  } catch(e) {}
+}
+
+async function refreshProcesses() {
+  try {
+    const r = await fetch('/api/processes');
+    const procs = await r.json();
+    const list = document.getElementById('proc-list');
+    if (!list) return;
+    list.innerHTML = procs.map(p => {
+      const chains = p.instances ? p.instances.slice(0,3).map(i => 
+        `<span style="color:#58a6ff">| ${i.chain}</span>`
+      ).join('') : '';
+      return `<div class="proc" title="${p.desc || ''}">
+        <div class="dot ${p.alive ? 'on' : 'off'}"></div>
+        <div class="name">${p.name}</div>
+        <div class="info">${p.desc || ''} ${chains}</div>
+        <div class="count">${p.alive ? '×'+p.count : '—'}</div>
+        <div class="actions"><button onclick="restartProc('${p.script || ''}')" title="Перезапустить">↻</button></div>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function refreshFindings() {
+  try {
+    const r = await fetch('/api/findings?n=20');
+    const findings = await r.json();
+    const list = document.getElementById('findings-list');
+    const cnt = document.getElementById('findings-count');
+    if (cnt) cnt.textContent = '(' + findings.length + ')';
+    if (!list) return;
+    if (!findings.length) {
+      list.innerHTML = '<div style="color:#484f58;padding:1rem;text-align:center">Пока ничего. Система ищет...</div>';
+      return;
+    }
+    list.innerHTML = findings.map(f => {
+      const cls = f.text && f.text.includes('CRITICAL') ? ' crit' : '';
+      const verdict = f.verdict ? `<div style="color:#d2991d;font-size:0.7rem;margin-top:2px">📋 ${f.verdict}</div>` : '';
+      return `<div class="finding${cls}"><span class="src">[${f.source}]</span> ${f.text}${verdict}</div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+function startLive() {
+  liveTimer = setInterval(() => {
+    refreshStats();
+    refreshProcesses();
+    const activeTab = document.querySelector('.tab-content.active');
+    if (activeTab && activeTab.id === 'findings') refreshFindings();
+  }, 30000);
+  document.getElementById('live-status').textContent = '● live (30s)';
+}
+
+// ---- Process restart ----
+async function restartProc(script) {
+  if (!script) return;
+  if (!confirm('Перезапустить ' + script + '?')) return;
+  try {
+    const form = new FormData();
+    form.append('script', script);
+    const r = await fetch('/api/process/restart', {method:'POST', body: form});
+    const d = await r.json();
+    toast(d.message, !d.ok);
+    setTimeout(refreshProcesses, 2000);
+  } catch(e) { toast('Ошибка: ' + e, true); }
+}
+
+// ---- Settings ----
+async function loadConfig() {
+  try {
+    const r = await fetch('/api/config');
+    const c = await r.json();
+    const editor = document.getElementById('config-editor');
+    if (editor && c.raw) editor.value = c.raw;
+  } catch(e) {}
+}
+
+async function saveConfig() {
+  const editor = document.getElementById('config-editor');
+  if (!editor) return;
+  try {
+    const form = new FormData();
+    form.append('raw', editor.value);
+    const r = await fetch('/api/config/save', {method:'POST', body: form});
+    const d = await r.json();
+    const msg = document.getElementById('config-msg');
+    msg.textContent = d.message;
+    msg.className = 'msg ' + (d.ok ? 'ok' : 'err');
+    toast(d.message, !d.ok);
+  } catch(e) { toast('Ошибка: ' + e, true); }
+}
+
+startLive();
+</script>
 </body>
 </html>
