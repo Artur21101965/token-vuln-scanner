@@ -1,13 +1,121 @@
-import time
+import time, os, tomllib
 from typing import Any, Optional
 import httpx
 
+# Популярные публичные RPC (фолбэк если нет в конфиге)
+DEFAULT_RPC_URLS = {
+    "ethereum": [
+        "https://ethereum-rpc.publicnode.com",
+        "https://eth.llamarpc.com",
+        "https://rpc.ankr.com/eth",
+        "https://eth.drpc.org",
+    ],
+    "polygon": [
+        "https://polygon-bor.publicnode.com",
+        "https://polygon.llamarpc.com",
+        "https://rpc.ankr.com/polygon",
+        "https://polygon.drpc.org",
+    ],
+    "arbitrum": [
+        "https://arb1.arbitrum.io/rpc",
+        "https://arbitrum.llamarpc.com",
+        "https://rpc.ankr.com/arbitrum",
+    ],
+    "base": [
+        "https://mainnet.base.org",
+        "https://base.llamarpc.com",
+        "https://rpc.ankr.com/base",
+    ],
+    "bsc": [
+        "https://bsc-dataseed.binance.org",
+        "https://bsc.llamarpc.com",
+        "https://rpc.ankr.com/bsc",
+        "https://binance.llamarpc.com",
+    ],
+    "optimism": [
+        "https://mainnet.optimism.io",
+        "https://optimism.llamarpc.com",
+        "https://rpc.ankr.com/optimism",
+    ],
+    "avalanche": [
+        "https://api.avax.network/ext/bc/C/rpc",
+        "https://avalanche.llamarpc.com",
+        "https://rpc.ankr.com/avalanche",
+    ],
+    "linea": [
+        "https://rpc.linea.build",
+        "https://linea.llamarpc.com",
+    ],
+    "scroll": [
+        "https://rpc.scroll.io",
+        "https://scroll.llamarpc.com",
+    ],
+}
+
+# Tor SOCKS5 прокси
+TOR_PROXY = "socks5://localhost:9050"
+
+
+def _load_config():
+    """Загружает config.toml."""
+    config_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.toml"
+    )
+    if os.path.exists(config_path):
+        with open(config_path, "rb") as f:
+            return tomllib.load(f)
+    return {}
+
+
+def is_tor_enabled() -> bool:
+    """Проверяет, включён ли Tor в конфиге."""
+    cfg = _load_config()
+    return cfg.get("tor", {}).get("enabled", False)
+
+
+def load_rpc_urls(chain: str) -> list[str]:
+    """Загружает список RPC URL для цепи из конфига или дефолтов."""
+    cfg = _load_config()
+    rpc_section = cfg.get("rpc", {})
+
+    # Поддержка множественных URL: rpc.ethereum = "url1,url2,url3"
+    raw = rpc_section.get(chain, "")
+    if raw:
+        urls = [u.strip() for u in raw.split(",") if u.strip()]
+        if urls:
+            return urls
+
+    # Поддержка нового формата: rpc.ethereum_urls = ["url1", "url2"]
+    urls_list = rpc_section.get(f"{chain}_urls", [])
+    if urls_list:
+        return urls_list if isinstance(urls_list, list) else [urls_list]
+
+    return DEFAULT_RPC_URLS.get(chain, [])
+
+
+def is_tor_available() -> bool:
+    """Проверяет, запущен ли Tor (quick TCP connect)."""
+    try:
+        import socket
+        s = socket.socket()
+        s.settimeout(1)
+        s.connect(("127.0.0.1", 9050))
+        s.close()
+        return True
+    except Exception:
+        return False
+
 
 class RpcClient:
-    def __init__(self, rpc_url: str, max_retries: int = 3):
+    def __init__(self, rpc_url: str, max_retries: int = 3, use_tor: bool = False):
         self._url = rpc_url
         self._max_retries = max_retries
-        self._http = httpx.Client(timeout=30)
+
+        if use_tor and is_tor_available():
+            transport = httpx.HTTPTransport(proxy=TOR_PROXY)
+            self._http = httpx.Client(timeout=30, transport=transport)
+        else:
+            self._http = httpx.Client(timeout=30)
 
     def call(self, method: str, params: list[Any] | None = None) -> Any:
         payload = {
@@ -91,9 +199,19 @@ class RpcClient:
 
 
 class MultiRpcClient:
-    """Round-robin RPC client across multiple endpoints to avoid rate limits."""
-    def __init__(self, rpc_urls: list[str], max_retries: int = 2):
-        self._clients = [RpcClient(url, max_retries=max_retries) for url in rpc_urls]
+    """Round-robin RPC client across multiple endpoints to avoid rate limits.
+    Поддерживает Tor-прокси и авто-загрузку URL из конфига."""
+
+    def __init__(self, rpc_urls: list[str] | None = None, chain: str = "",
+                 max_retries: int = 2, use_tor: bool = False):
+        if rpc_urls is None:
+            if chain:
+                rpc_urls = load_rpc_urls(chain)
+            if not rpc_urls:
+                rpc_urls = ["https://ethereum-rpc.publicnode.com"]
+
+        self._use_tor = use_tor or (is_tor_enabled() and is_tor_available())
+        self._clients = [RpcClient(url, max_retries=max_retries, use_tor=self._use_tor) for url in rpc_urls]
         self._idx = 0
 
     def _next(self) -> RpcClient:

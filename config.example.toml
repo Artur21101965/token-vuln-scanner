@@ -1,15 +1,21 @@
 [rpc]
-ethereum = "https://ethereum-rpc.publicnode.com"
-bsc = "https://bsc-dataseed.binance.org"
-arbitrum = "https://arb1.arbitrum.io/rpc"
-base = "https://mainnet.base.org"
-polygon = "https://polygon-bor.publicnode.com"
-avalanche = "https://api.avax.network/ext/bc/C/rpc"
-optimism = "https://mainnet.optimism.io"
+# Можно указать несколько URL через запятую — будет round-robin
+ethereum = "https://ethereum-rpc.publicnode.com,https://eth.llamarpc.com,https://rpc.ankr.com/eth"
+bsc = "https://bsc-dataseed.binance.org,https://bsc.llamarpc.com"
+arbitrum = "https://arb1.arbitrum.io/rpc,https://arbitrum.llamarpc.com"
+base = "https://mainnet.base.org,https://base.llamarpc.com"
+polygon = "https://polygon-bor.publicnode.com,https://polygon.llamarpc.com"
+avalanche = "https://api.avax.network/ext/bc/C/rpc,https://avalanche.llamarpc.com"
+optimism = "https://mainnet.optimism.io,https://optimism.llamarpc.com"
 zksync = "https://mainnet.era.zksync.io"
-linea = "https://rpc.linea.build"
-scroll = "https://rpc.scroll.io"
+linea = "https://rpc.linea.build,https://linea.llamarpc.com"
+scroll = "https://rpc.scroll.io,https://scroll.llamarpc.com"
 solana = "https://api.mainnet-beta.solana.com"
+
+[tor]
+# Включить Tor SOCKS5 прокси для всех RPC-запросов (полная анонимность)
+# Требуется: brew install tor && brew services start tor
+enabled = false
 
 [explorer]
 etherscan_key = "YOUR_ETHERSCAN_KEY"

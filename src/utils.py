@@ -74,20 +74,21 @@ TELEGRAM_CHAT_ID = ""
 def init_telegram():
     global TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
     try:
-        import tomllib
-        with open("config.toml", "rb") as f:
+        import tomllib, os
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.toml")
+        with open(config_path, "rb") as f:
             config = tomllib.load(f)
         tg = config.get("telegram", {})
         TELEGRAM_TOKEN = tg.get("bot_token", "")
         TELEGRAM_CHAT_ID = tg.get("chat_id", "")
-        if TELEGRAM_TOKEN:
-            logger.info("Telegram: готов (бот @sobiratelka_bot)")
     except Exception as e:
         logger.warning("Telegram config error: %s", e)
 
 
 def send_alert(message: str, level: str = "INFO"):
     """Send alert to Telegram."""
+    if not TELEGRAM_TOKEN:
+        init_telegram()
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         return
 
