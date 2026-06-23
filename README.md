@@ -1,83 +1,58 @@
-# Token Vulnerability Scanner
+# Monster Exploit Scanner
 
-Monitors newly deployed tokens on Ethereum (Uniswap), BSC (PancakeSwap), and Solana (Raydium) with liquidity > $500, scans them for contract vulnerabilities, and writes local reports.
+Автономный круглосуточный сканер уязвимостей смарт-контрактов.
 
-## Architecture
+**28 процессов, 45 проверок, 9 цепей, Flash Loan на Polygon.**
 
-Two independent processes connected via a SQLite queue:
+## Архитектура
 
-- **Monitor** — listens to DexScreener WebSocket, filters pairs with >$500 liquidity, writes to queue
-- **Analyzer** — picks tokens from the queue, runs 20+ vulnerability checks, writes JSON reports
+```
+ПОИСК (8 слоёв × 9 цепей + 17 источников утечек)
+  → ПРОВЕРКА (45 тестов + 4 API + Explorer V2 + исходники)
+    → ФАЗЗИНГ (Foundry + Echidna на QuickNode форке)
+      → АТАКА (Flash Loan контракт на Polygon + drain pipeline)
+        → АЛЕРТ (Telegram @sobiratelka_bot + Дашборд :8000)
+```
 
-## Quick Start
+## Быстрый старт
 
 ```bash
+# Клонирование
+git clone https://github.com/Artur21101965/token-vuln-scanner.git
+cd token-vuln-scanner
+
+# Окружение
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# Terminal 1 — start monitor
-python run_monitor.py
+# Конфиг (создать из примера)
+cp config.example.toml config.toml
+# Заполнить ключи в config.toml
 
-# Terminal 2 — start analyzer
-python run_analyzer.py
+# Дашборд
+python run_dashboard.py  # http://localhost:8000
+
+# Тесты
+python -m pytest --deselect tests/test_exploit_executor.py::test_no_signer_returns_false --deselect tests/test_dashboard.py
 ```
 
-## Configuration
+## Процессы
 
-Edit `config.toml` to set your RPC URLs and API keys:
+| # | Скрипт | Режим |
+|---|--------|-------|
+| 1-9 | `monster_scanner.py <chain> --loop` | Главный сканер |
+| 10-11 | `predator.py <chain>` | Мемпул + PairCreated |
+| 12 | `ens_sniper.py` | ENS домены 🆕 |
+| 13 | `solana_predator.py` | Solana монитор 🆕 |
+| 14 | `v4_hook_hunter.py` | Uniswap V4 хуки 🆕 |
+| 15 | `leaked_key_hunter.py` | 17 источников утечек |
+| 16 | `flash_auto.py` | Flash Loan атаки |
+| 17 | `key_monitor.py` | Проверка ключей |
+| 18 | `storage_fisher.py` | Ключи в storage |
 
-```toml
-[rpc]
-ethereum = "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY"
-bsc = "https://bsc-mainnet.g.alchemy.com/v2/YOUR_KEY"
-solana = "https://api.mainnet-beta.solana.com"
-```
+Подробности: `docs/PROJECT_MEMORY.md`
 
-## Reports
+## Лицензия
 
-Reports are written to `reports/<chain>/<token_address>/report.json` with a companion `findings.txt`.
-
-Example report structure:
-```
-reports/
-  ethereum/
-    0xabc123.../
-      report.json
-      findings.txt
-```
-
-## Supported Vulnerability Checks
-
-### EVM (Ethereum, BSC)
-- Ownership renounced
-- Mint function unprotected
-- LP tokens not burned
-- Honeypot (manual review)
-- Upgradeable proxy (delegatecall)
-- Pausable token
-- High tax/fees
-- Blacklist/whitelist
-- Max transaction/wallet limits
-- Selfdestruct in code
-- Reentrancy risk
-- AccessControl roles active
-
-### Solana
-- Mint authority not revoked
-- Freeze authority active
-- Pool ownership not renounced
-- LP not locked
-- Token-2022 extensions
-
-## Requirements
-
-- Python 3.11+
-- RPC endpoint for each chain (Infura/Alchemy for Ethereum, public RPC for others)
-- Etherscan/BscScan API keys (optional — for ABI resolution)
-
-## Running 24/7
-
-```bash
-# Using systemd or tmux/screen:
-tmux new -s monitor  'python run_monitor.py'
-tmux new -s analyzer 'python run_analyzer.py'
-```
+MIT

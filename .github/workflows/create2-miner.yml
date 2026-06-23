@@ -1,0 +1,90 @@
+name: CREATE2 Vanity Miner
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployer:
+        description: 'Адрес CREATE2 фабрики'
+        required: true
+        default: '0x4e59b44847b379578588920cA78FbF26c0B4956C'
+      init_code_hash:
+        description: 'keccak256(init_code) контракта'
+        required: true
+        default: '0x0000000000000000000000000000000000000000000000000000000000000000'
+      target_prefix:
+        description: 'Желаемый префикс адреса (hex без 0x)'
+        required: true
+        default: '000000'
+      workers:
+        description: 'Параллельных воркеров (1-16)'
+        required: false
+        default: '8'
+
+jobs:
+  mine:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        worker: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+      max-parallel: 16
+
+    steps:
+      - name: Skip unused workers
+        run: |
+          if [ ${{ matrix.worker }} -ge ${{ inputs.workers }} ]; then
+            echo "Worker ${{ matrix.worker }} skipped (max=${{ inputs.workers }})"
+            exit 0
+          fi
+
+      - name: Run CREATE2 miner — worker ${{ matrix.worker }}
+        run: |
+          python3 << 'PYEOF'
+          import hashlib, secrets, time
+
+          DEPLOYER   = bytes.fromhex("${{ inputs.deployer }}"[2:])
+          INIT_HASH  = bytes.fromhex("${{ inputs.init_code_hash }}"[2:])
+          PREFIX     = "${{ inputs.target_prefix }}"
+          PREFIX_LEN = len(PREFIX) // 2
+          WORKER     = ${{ matrix.worker }}
+
+          prefix_bytes = bytes.fromhex(PREFIX)
+          start = time.time()
+          tries = 0
+
+          print(f"[Worker {WORKER}] Prefix: 0x{PREFIX} ({PREFIX_LEN} bytes)")
+
+          while True:
+              salt = secrets.token_bytes(32)
+              preimage = b'\xff' + DEPLOYER + salt + INIT_HASH
+              addr = hashlib.sha3_256(preimage).digest()[12:]
+
+              tries += 1
+              if addr.startswith(prefix_bytes):
+                  elapsed = time.time() - start
+                  print(f"\n!!! FOUND by worker {WORKER} !!!")
+                  print(f"    Salt: 0x{salt.hex()}")
+                  print(f"    Address: 0x{addr.hex()}")
+                  print(f"    Tries: {tries} ({tries/1e6:.1f}M)")
+                  print(f"    Time: {elapsed:.1f}s")
+                  print(f"    Rate: {tries/elapsed:.0f} tries/s")
+
+                  with open("result.txt", "w") as f:
+                      f.write(f"salt=0x{salt.hex()}\n")
+                      f.write(f"address=0x{addr.hex()}\n")
+                      f.write(f"tries={tries}\n")
+                      f.write(f"time={elapsed:.1f}\n")
+                      f.write(f"worker={WORKER}\n")
+                  break
+
+              if tries % 100000 == 0:
+                  elapsed = time.time() - start
+                  print(f"[Worker {WORKER}] {tries/1e6:.1f}M tries, {tries/elapsed:.0f} tries/s")
+          PYEOF
+        timeout-minutes: 360
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: miner-result-worker-${{ matrix.worker }}
+          path: result.txt
