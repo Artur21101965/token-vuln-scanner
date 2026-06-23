@@ -18,7 +18,7 @@ import logging
 import time
 from decimal import Decimal
 from typing import Optional
-from src.rpc import RpcClient
+from src.rpc import RpcClient, MultiRpcClient, load_rpc_urls
 from src.types import TokenInfo, PoolInfo, Chain, ContractTarget, ScanReport, Finding
 from src.scanners.evm_scanner import EvmScanner
 from src.data import DataCollector
@@ -154,7 +154,7 @@ logger = logging.getLogger("monster")
 
 CHAIN_MAP: dict[str, Chain] = {c.name.lower(): c for c in Chain}
 MIN_BALANCE = 0.01
-SCAN_DELAY = 1.0  # seconds between contract scans
+SCAN_DELAY = 0.1  # seconds between contract scans (ускорено)
 
 # ---------------------------------------------------------------------------
 # Layer 1: CoinGecko token list
@@ -363,7 +363,7 @@ def main():
         print(f"No RPC for {chain_key}")
         return
 
-    rpc = RpcClient(rpc_url, max_retries=5)
+    rpc = MultiRpcClient(chain=chain_key, max_retries=5)
     iteration = 1
 
     while True:
