@@ -13,6 +13,7 @@ import tomllib
 import logging
 import time
 import sys
+import json
 from decimal import Decimal
 from typing import Optional
 from eth_utils import keccak
@@ -86,6 +87,77 @@ UNLOCK_SELECTORS = {
     "releasable": "0xa3f8c02b",    # releasable() → uint256
 }
 
+CHAINS_TO_ID = {
+    "ethereum": 1, "polygon": 137, "bsc": 56, "arbitrum": 42161,
+    "base": 8453, "optimism": 10, "avalanche": 43114,
+}
+
+
+def _load_etherscan_key():
+    try:
+        with open("config.toml", "rb") as f:
+            return tomllib.load(f).get("explorer", {}).get("etherscan_key", "")
+    except Exception:
+        return ""
+
+
+def _get_events_via_etherscan(chain_key: str, factory_addr: str, event_topic: str, max_results: int) -> list[str]:
+    """Получает дочерние контракты через Etherscan API (вместо eth_getLogs)."""
+    import urllib.request
+    chain_id = CHAINS_TO_ID.get(chain_key, 1)
+    api_key = _load_etherscan_key()
+    if not api_key:
+        return []
+
+    child_addrs = []
+    seen = set()
+
+    try:
+        url = (
+            f"https://api.etherscan.io/v2/api"
+            f"?chainid={chain_id}"
+            f"&module=logs"
+            f"&action=getLogs"
+            f"&address={factory_addr}"
+            f"&topic0=0x{event_topic}"
+            f"&fromBlock=0"
+            f"&toBlock=latest"
+            f"&page=1"
+            f"&offset={min(max_results * 2, 200)}"
+            f"&apikey={api_key}"
+        )
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = json.loads(r.read())
+
+        if data.get("status") != "1":
+            return []
+
+        logs = data.get("result", [])
+        for log in logs:
+            topics = log.get("topics", [])
+            data_str = log.get("data", "")
+
+            for t in topics[1:]:
+                addr = "0x" + t[-40:]
+                if len(addr) == 42 and addr not in seen:
+                    child_addrs.append(addr)
+                    seen.add(addr)
+
+            for offset in range(0, len(data_str) - 40, 64):
+                addr = "0x" + data_str[offset + 24:offset + 64]
+                if len(addr) == 42 and addr != "0x" + "0" * 40 and addr not in seen:
+                    child_addrs.append(addr)
+                    seen.add(addr)
+
+            if len(child_addrs) >= max_results:
+                break
+
+    except Exception:
+        pass
+
+    return child_addrs[:max_results]
+
 
 def check_unlocked_funds(rpc: RpcClient, addr: str, signer_addr: str) -> list[str]:
     """Check if a locker/vesting contract has unlocked funds claimable by us."""
@@ -140,7 +212,6 @@ def find_lockers(chain_key: str, rpc: RpcClient, max_per_factory: int = 100):
         # Get recent events from factory to find child contracts
         event_topic = FACTORY_EVENTS.get(factory_type)
         if not event_topic:
-            # Try to find child contracts via blockscout created-contracts instead
             try:
                 from src.abi_resolver import AbiResolver
                 resolver = AbiResolver()
@@ -149,33 +220,7 @@ def find_lockers(chain_key: str, rpc: RpcClient, max_per_factory: int = 100):
             except Exception:
                 child_addrs = []
         else:
-            try:
-                current = rpc.get_block_number()
-                from_block = max(0, current - 200000)  # ~1 месяц
-                logs = rpc.get_logs(hex(from_block), hex(current), factory_addr, ["0x" + event_topic])
-                child_addrs = []
-                seen = set()
-                for log in logs:
-                    # Extract contract address from event data/topics
-                    # For lockers: created contract is often in data or topic[1]
-                    topics = log.get("topics", [])
-                    data = log.get("data", "")
-                    # Try getting address from topics[1] (token) or topics[2] (owner)
-                    for t in topics[1:]:
-                        addr = "0x" + t[-40:]
-                        if len(addr) == 42 and addr not in seen:
-                            child_addrs.append(addr)
-                            seen.add(addr)
-                    # Also try data
-                    for offset in range(0, len(data) - 40, 64):
-                        addr = "0x" + data[offset + 24:offset + 64]
-                        if len(addr) == 42 and addr != "0x" + "0" * 40 and addr not in seen:
-                            child_addrs.append(addr)
-                            seen.add(addr)
-                    if len(child_addrs) >= max_per_factory:
-                        break
-            except Exception:
-                child_addrs = []
+            child_addrs = _get_events_via_etherscan(chain, factory_addr, event_topic, max_per_factory)
 
         logger.info("  Found %d child contracts", len(child_addrs))
 
@@ -224,7 +269,7 @@ def main():
     logger.info("LAUNCHPAD VULTURE — %s", chain_key.upper())
     logger.info("=" * 60)
 
-    findings = find_lockers(chain_key, rpc, max_per_factory=100)
+    findings = find_lockers(chain_key, rpc, max_per_factory=20)
 
     if findings:
         logger.info("=" * 60)

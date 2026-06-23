@@ -88,6 +88,18 @@ footer{text-align:center;color:#484f58;font-size:0.7rem;margin-top:1rem;padding-
 
   <div class="grid2">
     <div class="card">
+      <h2>💵 PNL</h2>
+      <div style="text-align:center;padding:0.5rem">
+        <div id="pnl-delta" style="font-size:1.8rem;font-weight:700;color:#3fb950">загрузка...</div>
+        <div style="font-size:0.7rem;color:#8b949e" id="pnl-detail"></div>
+      </div>
+      <div style="display:flex;justify-content:space-around;font-size:0.7rem;color:#8b949e;margin-top:0.5rem">
+        <span>⛽ Газ: <b id="pnl-gas">—</b></span>
+        <span>💰 Дрейн: <b id="pnl-drain">—</b></span>
+        <span>⚡ Flash: <b id="pnl-flash">—</b></span>
+      </div>
+    </div>
+    <div class="card">
       <h2>⛽ Газ</h2>
       <div class="gas" id="gas-block">
       {% for g in gas %}
@@ -95,27 +107,14 @@ footer{text-align:center;color:#484f58;font-size:0.7rem;margin-top:1rem;padding-
       {% endfor %}
       </div>
     </div>
-    <div class="card">
-      <h2>📡 ENS / V4 / Вестинг</h2>
-      <div class="ens-stats" id="ens-block">
-        <span>ENS: {{ stats.ens_expiring }} истекающих</span>
-        <span>V4: ожидание</span>
-        <span>Вестинг: сканирует</span>
-      </div>
-    </div>
   </div>
 
   <div class="card" style="margin-top:0.75rem">
-    <h2>📚 Слои поиска</h2>
-    <div class="layers">
-      <div class="layer"><div class="ln">CoinGecko</div><div class="ld">300 токенов</div></div>
-      <div class="layer"><div class="ln">Uniswap V2</div><div class="ld">200 пар</div></div>
-      <div class="layer"><div class="ln">Blockscout</div><div class="ld">Свежие</div></div>
-      <div class="layer"><div class="ln">Transfer Events</div><div class="ld">Активные</div></div>
-      <div class="layer"><div class="ln">Known Targets</div><div class="ld">Мосты,CEX</div></div>
-      <div class="layer"><div class="ln">Sushi/Pancake</div><div class="ld">400 пар</div></div>
-      <div class="layer"><div class="ln">MEV Searchers</div><div class="ld">Боты</div></div>
-      <div class="layer"><div class="ln">NFT/ERC-4337</div><div class="ld">Маркетплейсы</div></div>
+    <h2>📡 ENS / V4 / Вестинг</h2>
+    <div class="ens-stats" id="ens-block">
+      <span>ENS: {{ stats.ens_expiring }} истекающих</span>
+      <span>V4: ожидание запуска</span>
+      <span>Ключей: {{ stats.keys_monitored }}</span>
     </div>
   </div>
 </div>
@@ -212,6 +211,24 @@ async function refreshStats() {
     document.getElementById('s-findings').textContent = s.findings_db + s.findings_txt;
     document.getElementById('s-keys').textContent = s.keys_monitored;
     document.getElementById('proc-count').textContent = s.processes_alive + '/' + s.processes_total;
+  } catch(e) {}
+  refreshPNL();
+}
+
+async function refreshPNL() {
+  try {
+    const r = await fetch('/api/pnl');
+    const p = await r.json();
+    if (p.error) return;
+    const d = document.getElementById('pnl-delta');
+    const sign = p.delta_usd >= 0 ? '+' : '';
+    d.textContent = sign + '$' + p.delta_usd.toFixed(2);
+    d.style.color = p.is_profitable ? '#3fb950' : '#f85149';
+    document.getElementById('pnl-detail').textContent =
+      'Старт: $' + p.start_usd.toFixed(2) + ' | Сейчас: $' + p.current_usd.toFixed(2);
+    document.getElementById('pnl-gas').textContent = '$' + p.gas_total.toFixed(4);
+    document.getElementById('pnl-drain').textContent = '$' + p.drained_total.toFixed(2);
+    document.getElementById('pnl-flash').textContent = p.flash_attempts + ' попыток';
   } catch(e) {}
 }
 

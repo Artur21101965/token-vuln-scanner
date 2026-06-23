@@ -1,5 +1,5 @@
 """Dashboard with tabs, real-time stats, process details, findings feed, settings."""
-import os, glob, json, subprocess, time
+import os, glob, json, subprocess, time, threading
 from datetime import datetime
 from pathlib import Path
 from fastapi import FastAPI, Request, Form
@@ -11,6 +11,9 @@ import tomllib as _tomllib
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 app = FastAPI(title="Monster Exploit Scanner")
 _jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True)
+
+# Запускаем PNL трекер при старте дашборда
+_pnl_started = False
 
 CHAIN_NAMES = {"ethereum": "Ethereum", "polygon": "Polygon", "arbitrum": "Arbitrum",
                "base": "Base", "bsc": "BSC", "optimism": "Optimism", "avalanche": "Avalanche",
@@ -239,6 +242,18 @@ def _read_config_toml():
 
 # ---- ROUTES ----
 
+@app.on_event("startup")
+async def startup():
+    global _pnl_started
+    if not _pnl_started:
+        try:
+            from src.pnl_tracker import start_background
+            start_background()
+            _pnl_started = True
+        except Exception:
+            pass
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     processes = _get_processes()
@@ -335,3 +350,28 @@ async def api_restart_process(script: str = Form("")):
         return JSONResponse({"ok": True, "message": f"{script} перезапущен"})
     except Exception as e:
         return JSONResponse({"ok": False, "message": str(e)}, status_code=500)
+
+
+@app.get("/api/pnl")
+async def api_pnl():
+    try:
+        from src.pnl_tracker import get_snapshot
+        snap = get_snapshot()
+        start = snap.get("start_usd", 0)
+        current = snap.get("current_usd", 0)
+        delta = round(current - start, 2)
+        return JSONResponse({
+            "start_usd": start,
+            "current_usd": current,
+            "delta_usd": delta,
+            "is_profitable": delta >= -0.01,  # допускаем погрешность
+            "balances": snap.get("current_balances", {}),
+            "gas_total": snap.get("total_gas_spent", 0),
+            "drained_total": snap.get("total_drained_usd", 0),
+            "flash_profit": snap.get("flash_profit_usd", 0),
+            "flash_attempts": snap.get("flash_attempts", 0),
+            "drain_attempts": snap.get("drain_attempts", 0),
+            "last_update": snap.get("last_update", ""),
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)

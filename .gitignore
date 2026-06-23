@@ -22,6 +22,23 @@ critical_*.txt
 token_rich_*.txt
 leaked_keys_found.txt
 github_scout_findings.txt
+all_leaked_private_keys.txt
+all_money_contracts.txt
+rich_*.txt
+audit_findings.txt
+audit_result.log
+autonomous_audit_findings.txt
+deep_audit_target.txt
+full_erc20_hits.txt
+immunefi_*.txt
+immunefi_pages/
+key_balances_state.json
+pnl_state.json
+pnl_history.jsonl
+storage_keys_found.txt
+zeroday_ethereum.txt
+vulture_*.txt
+fuzzed_contracts.txt
 
 # Foundry (свой git-репо, коммитится отдельно)
 fuzz/foundry/
