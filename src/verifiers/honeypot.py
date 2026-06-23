@@ -3,7 +3,6 @@ from src.verifiers.base import Verifier, VerificationResult
 from src.types import Finding, Severity, Chain
 from src.scanners.base import CheckContext
 
-
 CHAIN_ROUTERS: dict[Chain, dict[str, str]] = {
     Chain.ETHEREUM: {
         "router": "0x7a250d5630b4cf539739df2c5dacb4c659f2488d",
@@ -47,7 +46,30 @@ CHAIN_ROUTERS: dict[Chain, dict[str, str]] = {
     },
 }
 
-GET_AMOUNTS_OUT_SIG = "0xd06ca61f"
+SWAP_ETH_FOR_TOKENS_SIG = "0x7ff36ab5"
+CALLER = "0x0000000000000000000000000000000000000001"
+BUY_AMOUNT_WEI = 10 ** 17  # 0.1 ETH
+
+
+def _encode_buy(weth: str, token: str) -> str:
+    deadline = "f" * 64
+    return (SWAP_ETH_FOR_TOKENS_SIG +
+            "0000000000000000000000000000000000000000000000000000000000000000" +
+            "0000000000000000000000000000000000000000000000000000000000000080" +
+            CALLER[2:].zfill(64) +
+            deadline +
+            "0000000000000000000000000000000000000000000000000000000000000002" +
+            weth[2:].zfill(64) +
+            token[2:].zfill(64))
+
+
+def _parse_swap_result(result: str) -> int:
+    if not result or len(result) < 66:
+        return 0
+    raw = result[2:]
+    if len(raw) < 192:
+        return 0
+    return int(raw[192:256], 16)
 
 
 class HoneypotVerifier(Verifier):
@@ -78,40 +100,46 @@ class HoneypotVerifier(Verifier):
 
         router_addr = routers["router"]
         weth_addr = routers["weth"]
+        token_addr = ctx.token.address
+
+        buy_data = _encode_buy(weth_addr, token_addr)
+        value_hex = hex(BUY_AMOUNT_WEI)
 
         try:
-            path = [weth_addr, ctx.token.address, weth_addr]
-            amount = 10 ** 18
-            data = (GET_AMOUNTS_OUT_SIG +
-                    hex(amount)[2:].zfill(64) +
-                    "0000000000000000000000000000000000000000000000000000000000000060"
-                    "0000000000000000000000000000000000000000000000000000000000000003" +
-                    path[0][2:].zfill(64) +
-                    path[1][2:].zfill(64) +
-                    path[2][2:].zfill(64))
-
-            result = ctx.rpc.eth_call(router_addr, data)
-            raw = result[2:]
-            sell_amount = int(raw[256:320], 16) if len(raw) >= 320 else 0
-
-            if sell_amount > 0:
-                return VerificationResult(
-                    finding=finding,
-                    confirmed=False,
-                    confidence=0.85,
-                    evidence=f"Buy+sell cycle returned {sell_amount} wei on {ctx.token.chain.name} — not a honeypot",
-                )
-            else:
-                return VerificationResult(
-                    finding=finding,
-                    confirmed=True,
-                    confidence=0.9,
-                    evidence=f"Sell returned 0 on {ctx.token.chain.name} — cannot sell tokens",
-                )
+            buy_result = ctx.rpc.eth_call(
+                router_addr, buy_data,
+                from_address=CALLER,
+                value=value_hex,
+            )
         except Exception as exc:
             return VerificationResult(
                 finding=finding,
                 confirmed=True,
-                confidence=0.8,
-                evidence=f"Sell simulation reverted on {ctx.token.chain.name}: {exc}",
+                confidence=0.95,
+                evidence=f"Buy simulation reverted on {ctx.token.chain.name}: {exc}",
             )
+
+        amount_bought = _parse_swap_result(buy_result)
+        if amount_bought == 0:
+            return VerificationResult(
+                finding=finding,
+                confirmed=True,
+                confidence=0.9,
+                evidence=f"Bought 0 tokens on {ctx.token.chain.name} — 100% tax or fake liquidity",
+            )
+
+        effective_tax_pct = (1 - amount_bought / BUY_AMOUNT_WEI) * 100
+        if effective_tax_pct > 20:
+            return VerificationResult(
+                finding=finding,
+                confirmed=True,
+                confidence=0.8,
+                evidence=f"Buy OK but only got {amount_bought} tokens ({effective_tax_pct:.0f}% tax) on {ctx.token.chain.name}",
+            )
+
+        return VerificationResult(
+            finding=finding,
+            confirmed=False,
+            confidence=0.7,
+            evidence=f"Buy OK ({amount_bought} tokens, {effective_tax_pct:.1f}% tax) on {ctx.token.chain.name} — not a honeypot",
+        )

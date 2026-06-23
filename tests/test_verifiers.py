@@ -52,17 +52,20 @@ def test_honeypot_verifier_no_pair_address():
     assert r.confidence < 1.0
 
 
-def test_honeypot_verifier_sell_possible():
+# swapExactETHForTokens returns: [0.1 ETH in, 10^18 tokens out] → ~0% buy tax
+# ABI-encoded: offset(32) | length=2(32) | amounts[0](32) | amounts[1](32)
+BUY_RESULT_OK = (
+    "0x"
+    "0000000000000000000000000000000000000000000000000000000000000020"
+    "0000000000000000000000000000000000000000000000000000000000000002"
+    "000000000000000000000000000000000000000000000000016345785d8a0000"
+    "0000000000000000000000000000000000000000000000008ac7230489e80000"
+)
+
+
+def test_honeypot_verifier_buy_ok_low_tax():
     rpc = Mock(spec=RpcClient)
-    abi_encoded = (
-        "0x"
-        "0000000000000000000000000000000000000000000000000000000000000020"  # offset
-        "0000000000000000000000000000000000000000000000000000000000000003"  # length=3
-        "00000000000000000000000000000000000000000000000000000002540be400"  # 10 ETH in
-        "0000000000000000000000000000000000000000000000000000000000000064"  # 100 tokens bought
-        "0000000000000000000000000000000000000000000000000000000000000032"  # 50 wei from sell
-    )
-    rpc.eth_call.return_value = abi_encoded
+    rpc.eth_call.return_value = BUY_RESULT_OK
     ctx = CheckContext(
         token=TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM),
         pool=PoolInfo(address="0xpool", dex="Uniswap V2", liquidity_usd=5000),
@@ -73,10 +76,10 @@ def test_honeypot_verifier_sell_possible():
     v = HoneypotVerifier()
     r = v.verify(ctx, f)
     assert r.confirmed is False
-    assert r.confidence > 0  # false positive — sell works
+    assert r.confidence > 0
 
 
-def test_honeypot_verifier_sell_reverts():
+def test_honeypot_verifier_buy_reverts():
     rpc = Mock(spec=RpcClient)
     rpc.eth_call.side_effect = RuntimeError("execution reverted")
     ctx = CheckContext(
@@ -89,20 +92,12 @@ def test_honeypot_verifier_sell_reverts():
     v = HoneypotVerifier()
     r = v.verify(ctx, f)
     assert r.confirmed is True
-    assert r.confidence > 0.5
+    assert r.confidence > 0.9
 
 
 def test_honeypot_verifier_bsc():
     rpc = Mock(spec=RpcClient)
-    abi_encoded = (
-        "0x"
-        "0000000000000000000000000000000000000000000000000000000000000020"
-        "0000000000000000000000000000000000000000000000000000000000000003"
-        "00000000000000000000000000000000000000000000000000000002540be400"
-        "0000000000000000000000000000000000000000000000000000000000000064"
-        "0000000000000000000000000000000000000000000000000000000000000032"
-    )
-    rpc.eth_call.return_value = abi_encoded
+    rpc.eth_call.return_value = BUY_RESULT_OK
     ctx = CheckContext(
         token=TokenInfo(address="0xabc", symbol="T", chain=Chain.BSC),
         pool=PoolInfo(address="0xpool", dex="PancakeSwap", liquidity_usd=5000),
@@ -170,16 +165,7 @@ def test_verifier_runner_runs_applicable():
 
 def test_verifier_runner_dismisses_false_positive():
     rpc = Mock(spec=RpcClient)
-    # ABI-encoded return with sell_amount > 0
-    abi_encoded = (
-        "0x"
-        "0000000000000000000000000000000000000000000000000000000000000020"
-        "0000000000000000000000000000000000000000000000000000000000000003"
-        "00000000000000000000000000000000000000000000000000000002540be400"
-        "0000000000000000000000000000000000000000000000000000000000000064"
-        "0000000000000000000000000000000000000000000000000000000000000032"
-    )
-    rpc.eth_call.return_value = abi_encoded
+    rpc.eth_call.side_effect = [BUY_RESULT_OK, "0x01"]
     ctx = CheckContext(
         token=TokenInfo(address="0xabc", symbol="T", chain=Chain.ETHEREUM),
         pool=PoolInfo(address="0xpool", dex="Uniswap V2", liquidity_usd=5000),

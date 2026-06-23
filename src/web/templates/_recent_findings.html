@@ -1,0 +1,19 @@
+{% if findings %}
+<div class="finding-list">
+    {% for f in findings %}
+    <div class="finding-item">
+        <div>
+            <span class="badge" style="background: {{ severity_colors.get(f.severity, '#30363d') }}">{{ f.severity }}</span>
+            <strong>{{ f.check_name }}</strong>
+            <span style="font-size:0.8rem; color:#8b949e">
+                <a href="/token/{{ f.token_address }}">{{ f.token_symbol or f.token_address[:10] }}...</a>
+            </span>
+        </div>
+        <p style="margin:0.4rem 0; font-size:0.85rem">{{ f.description[:100] }}{% if f.description|length > 100 %}...{% endif %}</p>
+        <div class="meta">{{ f.created_at }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p>Нет находок за последнее время</p>
+{% endif %}

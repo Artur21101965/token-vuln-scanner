@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ token_address[:10] }}... — Token Vuln Scanner{% endblock %}
+{% block content %}
+
+<div style="margin-bottom: 1rem">
+    <h2>Токен: {{ token_address }}</h2>
+    {% if token_info %}
+    <p style="color:#8b949e; font-size:0.9rem">
+        Символ: {{ token_info.token_symbol or '?' }} |
+        Сеть: {{ token_info.chain or '?' }} |
+        Впервые: {{ token_info.first_seen }} |
+        Последний раз: {{ token_info.last_seen }}
+    </p>
+    {% endif %}
+</div>
+
+{% if summary %}
+<div class="stats" style="margin-bottom:1rem">
+    {% for row in summary %}
+    <div class="stat-card">
+        <div class="num" style="color: {{ severity_colors.get(row.severity, 'white') }}">{{ row.cnt }}</div>
+        <div class="label">{{ row.severity }}</div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<h3>Находки</h3>
+{% for f in findings %}
+<div class="finding-item">
+    <div>
+        <span class="badge" style="background: {{ severity_colors.get(f.severity, '#30363d') }}">{{ f.severity }}</span>
+        <strong>{{ f.check_name }}</strong>
+    </div>
+    <p style="margin:0.4rem 0">{{ f.description }}</p>
+    <p style="font-size:0.8rem; color:#8b949e">Рекомендация: {{ f.recommendation }}</p>
+    <div class="meta">{{ f.created_at }}</div>
+</div>
+{% else %}
+<p>Находок нет</p>
+{% endfor %}
+
+{% endblock %}

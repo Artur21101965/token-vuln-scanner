@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING, Optional
 from src.scanners.base import BaseScanner, BaseCheck, CheckContext
 from src.scanners.checks.evm import ALL_EVM_CHECKS
@@ -47,12 +48,10 @@ class EvmScanner(BaseScanner):
 
         if self._executor:
             for f in report.findings:
-                if self._executor.can_execute(f):
-                    conf = f.details.get("verification_confidence", 0)
-                    if conf >= 0.9:
-                        logger = logging.getLogger(__name__)
-                        logger.warning("Exploiting %s on %s (conf=%s)...",
-                                       f.check_name, token.symbol, conf)
-                        self._executor.execute(ctx, f)
+                if self._executor.can_execute(f) and f.confidence is not None and f.confidence >= 0.9:
+                    logger = logging.getLogger(__name__)
+                    logger.warning("Exploiting %s on %s (conf=%s)...",
+                                   f.check_name, token.symbol, f.confidence)
+                    self._executor.execute(ctx, f)
 
         return report

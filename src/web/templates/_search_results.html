@@ -1,0 +1,10 @@
+{% if results %}
+<div style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:0.5rem; margin-bottom:0.5rem">
+    {% for r in results %}
+    <div style="padding:0.3rem 0">
+        <a href="/token/{{ r._token_address }}">{{ r._token_address[:15] }}... ({{ r._token_symbol or '?' }})</a>
+        <span style="color:#8b949e; font-size:0.8rem">{{ r._chain or '?' }} · {{ r._scanned_at }}</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

@@ -1,7 +1,41 @@
 __pycache__/
 *.pyc
 *.db
+.db-journal
 .env
 reports/
 venv/
 .venv/
+logs/
+config.toml
+config.local.toml
+
+# Логи
+*.log
+
+# Выходные файлы сканеров
+ens_expiring.txt
+solana_vulnerable.txt
+v4_hooks_found.txt
+v4_hook_state.json
+critical_*.txt
+token_rich_*.txt
+leaked_keys_found.txt
+github_scout_findings.txt
+
+# Foundry (свой git-репо, коммитится отдельно)
+fuzz/foundry/
+
+# OS
+.DS_Store
+*.swp
+*.swo
+
+# IDE
+.idea/
+.vscode/
+
+# Ключи
+*.pem
+*.key
+secrets/

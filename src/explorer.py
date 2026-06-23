@@ -1,81 +1,82 @@
+"""Explorer API client — Etherscan V2 family (Etherscan, Arbiscan, Basescan, etc)."""
 from typing import Optional
 import httpx
 from src.types import Chain
 
 
+CHAIN_IDS = {
+    Chain.ETHEREUM: 1,
+    Chain.BSC: 56,
+    Chain.ARBITRUM: 42161,
+    Chain.BASE: 8453,
+    Chain.POLYGON: 137,
+    Chain.AVALANCHE: 43114,
+    Chain.OPTIMISM: 10,
+    Chain.ZKSYNC: 324,
+    Chain.LINEA: 59144,
+    Chain.SCROLL: 534352,
+}
+
+
 class ExplorerClient:
     def __init__(self, api_key: str = ""):
         self._key = api_key
-        self._http = httpx.Client(timeout=15)
+        self._http = httpx.Client(timeout=15, follow_redirects=True)
 
-    def _base_url(self, chain: Chain) -> str:
-        urls = {
-            Chain.ETHEREUM: "https://api.etherscan.io",
-            Chain.BSC: "https://api.bscscan.com",
-            Chain.ARBITRUM: "https://api.arbiscan.io",
-            Chain.BASE: "https://api.basescan.org",
-            Chain.POLYGON: "https://api.polygonscan.com",
-            Chain.AVALANCHE: "https://api.snowtrace.io",
-            Chain.OPTIMISM: "https://api-optimistic.etherscan.io",
-            Chain.ZKSYNC: "https://api-era.zksync.network",
-            Chain.LINEA: "https://api.lineascan.build",
-            Chain.SCROLL: "https://api.scrollscan.com",
+    @staticmethod
+    def _base_url() -> str:
+        return "https://api.etherscan.io/v2/api"
+
+    def _params(self, address: str, action: str, chain: Chain) -> dict:
+        return {
+            "chainId": CHAIN_IDS.get(chain, 1),
+            "module": "contract",
+            "action": action,
+            "address": address,
+            "apikey": self._key,
         }
-        return urls.get(chain, "")
 
     def get_abi(self, address: str, chain: Chain) -> Optional[str]:
         if chain == Chain.SOLANA:
             return None
-        base = self._base_url(chain)
-        if not base:
+        chain_id = CHAIN_IDS.get(chain)
+        if not chain_id:
             return None
-        params = {
-            "module": "contract",
-            "action": "getabi",
-            "address": address,
-            "apikey": self._key,
-        }
-        resp = self._http.get(f"{base}/api", params=params)
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") != "1":
+        try:
+            resp = self._http.get(self._base_url(), params=self._params(address, "getabi", chain))
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            if data.get("status") != "1":
+                return None
+            return data.get("result")
+        except Exception:
             return None
-        return data.get("result")
 
     def get_source_code(self, address: str, chain: Chain) -> Optional[str]:
         if chain == Chain.SOLANA:
             return None
-        base = self._base_url(chain)
-        if not base:
+        chain_id = CHAIN_IDS.get(chain)
+        if not chain_id:
             return None
-        params = {
-            "module": "contract",
-            "action": "getsourcecode",
-            "address": address,
-            "apikey": self._key,
-        }
-        resp = self._http.get(f"{base}/api", params=params)
-        resp.raise_for_status()
-        data = resp.json()
-        if data.get("status") != "1" or not data.get("result"):
+        try:
+            resp = self._http.get(self._base_url(), params=self._params(address, "getsourcecode", chain))
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            if data.get("status") != "1" or not data.get("result"):
+                return None
+            return data["result"][0].get("SourceCode", "")
+        except Exception:
             return None
-        return data["result"][0].get("SourceCode", "")
 
     def get_contract_creation(self, address: str, chain: Chain) -> Optional[str]:
         if chain == Chain.SOLANA:
             return None
-        base = self._base_url(chain)
-        if not base:
-            return None
-        params = {
-            "module": "contract",
-            "action": "getcontractcreation",
-            "contractaddresses": address,
-            "apikey": self._key,
-        }
         try:
-            resp = self._http.get(f"{base}/api", params=params, timeout=10)
-            resp.raise_for_status()
+            resp = self._http.get(self._base_url(), params=self._params(address, "getcontractcreation", chain))
+            if resp.status_code != 200:
+                return None
             data = resp.json()
             if data.get("status") != "1" or not data.get("result"):
                 return None

@@ -25,6 +25,24 @@ from src.scanners.checks.evm.cross_contract import CrossContractCheck
 from src.scanners.checks.evm.historical import HistoricalAnalysisCheck
 from src.scanners.checks.evm.storage_layout import StorageLayoutCheck
 from src.scanners.checks.evm.sandwich_flash import SandwichFlashCheck
+from src.scanners.checks.evm.evmole_discovery import EvmoleFunctionDiscoveryCheck
+from src.scanners.checks.evm.cross_contract_reentrancy import CrossContractReentrancyCheck
+from src.scanners.checks.evm.selfdestruct_param import SelfdestructWithParamCheck
+from src.scanners.checks.evm.uninitialized_proxy import UninitializedProxyCheck
+from src.scanners.checks.evm.sweep import UnprotectedSweepCheck
+from src.scanners.checks.evm.selector_fuzz import SelectorFuzzCheck
+from src.scanners.checks.evm.permit_max import PermitMaxAllowanceCheck
+from src.scanners.checks.evm.amm_skim import AmmSkimSyncCheck
+from src.scanners.checks.evm.delegatecall_inject import DelegatecallInjectionCheck
+from src.scanners.checks.evm.sig_replay import SignatureReplayCheck
+from src.scanners.checks.evm.multicall_check import MulticallUncheckedCheck
+from src.scanners.checks.evm.opcode_scanner import (
+    OpcodeSelfdestructCheck, OpcodeDelegatecallInjectCheck,
+    OpcodeUncheckedCallCheck, OpcodeTimestampCheck, OpcodeExtcodesizeCheck,
+)
+from src.scanners.checks.evm.storage_collision import (
+    ProxyStorageCollisionCheck, UncheckedERC20ReturnCheck,
+)
 
 ALL_EVM_CHECKS = [
     MintCheck,
@@ -54,4 +72,22 @@ ALL_EVM_CHECKS = [
     HistoricalAnalysisCheck,
     StorageLayoutCheck,
     SandwichFlashCheck,
+    EvmoleFunctionDiscoveryCheck,
+    CrossContractReentrancyCheck,
+    SelfdestructWithParamCheck,
+    UninitializedProxyCheck,
+    UnprotectedSweepCheck,
+    SelectorFuzzCheck,
+    PermitMaxAllowanceCheck,
+    AmmSkimSyncCheck,
+    DelegatecallInjectionCheck,
+    SignatureReplayCheck,
+    MulticallUncheckedCheck,
+    OpcodeSelfdestructCheck,
+    OpcodeDelegatecallInjectCheck,
+    OpcodeUncheckedCallCheck,
+    OpcodeTimestampCheck,
+    OpcodeExtcodesizeCheck,
+    ProxyStorageCollisionCheck,
+    UncheckedERC20ReturnCheck,
 ]

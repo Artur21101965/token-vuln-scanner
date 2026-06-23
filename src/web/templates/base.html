@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="30">
+    <title>Monster Exploit Scanner — Дашборд</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:#0d1117; color:#c9d1d9; padding:1rem; }
+        a { color:#58a6ff; text-decoration:none; }
+        .container { max-width:1400px; margin:0 auto; }
+        header { display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; padding-bottom:1rem; border-bottom:1px solid #30363d; }
+        header h1 { font-size:1.3rem; color:#f0f6fc; }
+        header h1 span { color:#58a6ff; }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+        .grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:0.75rem; margin-bottom:1rem; }
+        .card { background:#161b22; border:1px solid #30363d; border-radius:8px; padding:1rem; }
+        .card h2 { font-size:0.85rem; color:#8b949e; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.75rem; }
+        .stat { text-align:center; }
+        .stat .num { font-size:2rem; font-weight:700; }
+        .stat .label { font-size:0.7rem; color:#8b949e; text-transform:uppercase; }
+        .stat.red .num { color:#f85149; }
+        .stat.orange .num { color:#d2991d; }
+        .stat.green .num { color:#3fb950; }
+        .stat.blue .num { color:#58a6ff; }
+        .process-row { display:flex; justify-content:space-between; padding:0.3rem 0; border-bottom:1px solid #21262d; font-size:0.85rem; }
+        .process-row .name { font-weight:500; }
+        .process-row .status { font-size:0.75rem; }
+        .status-live { color:#3fb950; }
+        .status-dead { color:#f85149; }
+        .chain-card { border-left:3px solid #30363d; padding:0.75rem; background:#161b22; border-radius:4px; }
+        .chain-card.eth { border-left-color:#627eea; }
+        .chain-card.polygon { border-left-color:#8247e5; }
+        .chain-card.arbitrum { border-left-color:#28a0f0; }
+        .chain-card.base { border-left-color:#0052ff; }
+        .chain-card .chain-name { font-size:0.8rem; font-weight:600; margin-bottom:0.3rem; }
+        .chain-card .gas { font-size:0.75rem; color:#8b949e; }
+        .chain-card .gas.ok { color:#3fb950; }
+        .chain-card .gas.low { color:#f85149; }
+        .finding { padding:0.5rem 0.75rem; border-left:3px solid; margin:0.3rem 0; font-size:0.85rem; background:#0d1117; border-radius:3px; }
+        .finding.CRITICAL { border-left-color:#f85149; }
+        .finding.HIGH { border-left-color:#d2991d; }
+        .finding .addr { color:#8b949e; font-size:0.7rem; }
+        table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+        th, td { text-align:left; padding:0.4rem 0.5rem; border-bottom:1px solid #21262d; }
+        th { color:#8b949e; font-weight:500; text-transform:uppercase; font-size:0.7rem; }
+        .tag { display:inline-block; padding:0.1rem 0.4rem; border-radius:3px; font-size:0.65rem; font-weight:600; }
+        .tag.red { background:#f8514922; color:#f85149; }
+        .tag.green { background:#3fb95022; color:#3fb950; }
+        .tag.blue { background:#58a6ff22; color:#58a6ff; }
+        .empty { color:#484f58; font-style:italic; font-size:0.85rem; padding:1rem; text-align:center; }
+        .pulse { animation:pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🦖 <span>Monster</span> Exploit Scanner</h1>
+        <span style="color:#8b949e;font-size:0.8rem;">Дашборд — автообновление 30с</span>
+        <span style="margin-left:auto;font-size:0.75rem;color:#8b949e;">{{ now }}</span>
+    </header>
+
+    <!-- Карточки статистики -->
+    <div class="grid4">
+        <div class="stat {{ 'red' if critical_count > 0 else 'green' }}">
+            <div class="num">{{ critical_count }}</div>
+            <div class="label">CRITICAL находок</div>
+        </div>
+        <div class="stat blue">
+            <div class="num">{{ process_count }}</div>
+            <div class="label">Процессов запущено</div>
+        </div>
+        <div class="stat {{ 'green' if chains_with_gas > 0 else 'orange' }}">
+            <div class="num">{{ chains_with_gas }}</div>
+            <div class="label">Цепей с газом</div>
+        </div>
+        <div class="stat blue">
+            <div class="num">{{ rpc_keys }}</div>
+            <div class="label">RPC ключей</div>
+        </div>
+    </div>
+
+    <div class="grid2">
+        <!-- ЛЕВАЯ КОЛОНКА -->
+        <div>
+            <!-- Процессы -->
+            <div class="card" style="margin-bottom:1rem;">
+                <h2>⚙️ Процессы</h2>
+                {% for p in processes %}
+                <div class="process-row">
+                    <span class="name">{{ p.name }}</span>
+                    <span style="color:#8b949e;font-size:0.75rem;">{{ p.chain }} | PID {{ p.pid }}</span>
+                    <span class="status {{ 'status-live' if p.alive else 'status-dead' }}">{{ '● работа' if p.alive else '○ остановлен' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Газ по цепям -->
+            <div class="card" style="margin-bottom:1rem;">
+                <h2>⛽ Газ на сигнере</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+                {% for c in gas_balances %}
+                <div class="chain-card {{ c.chain }}">
+                    <div class="chain-name">{{ c.chain_name }}</div>
+                    <div class="gas {{ 'ok' if c.has_gas else 'low' }}">{{ c.balance }}</div>
+                </div>
+                {% endfor %}
+                </div>
+                <div style="font-size:0.65rem;color:#484f58;margin-top:0.5rem;">Сигнер: {{ signer }}</div>
+            </div>
+
+            <!-- RPC ключи -->
+            <div class="card">
+                <h2>🔑 RPC ключи / сети</h2>
+                {% for k in rpc_info %}
+                <div class="process-row">
+                    <span>{{ k.key_name }}</span>
+                    <span style="color:#8b949e;">{{ k.chains }}</span>
+                    <span class="tag {{ 'green' if k.healthy else 'red' }}">{{ '✓' if k.healthy else '✗' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА -->
+        <div>
+            <!-- CRITICAL находки -->
+            <div class="card" style="margin-bottom:1rem;">
+                <h2>🚨 Критические находки</h2>
+                {% if critical_findings %}
+                    {% for f in critical_findings %}
+                    <div class="finding CRITICAL">
+                        <strong>{{ f.check }}</strong>
+                        <span class="addr">{{ f.address }} | {{ f.chain }} | {{ f.balance }} | conf={{ f.conf }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty">Пока нет. Система ищет...</div>
+                {% endif %}
+            </div>
+
+            <!-- Последние находки -->
+            <div class="card" style="margin-bottom:1rem;">
+                <h2>📋 Последние сканы</h2>
+                {% if recent_scans %}
+                <table>
+                    <tr><th>Контракт</th><th>Цепь</th><th>Баланс</th><th>CRIT</th><th>HIGH</th></tr>
+                    {% for s in recent_scans %}
+                    <tr>
+                        <td style="font-family:monospace;font-size:0.75rem;">{{ s.addr }}</td>
+                        <td>{{ s.chain }}</td>
+                        <td>{{ s.bal }}</td>
+                        <td><span class="tag red">{{ s.crit }}</span></td>
+                        <td><span class="tag">{{ s.high }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="empty">Нет данных</div>
+                {% endif %}
+            </div>
+
+            <!-- Файлы с находками -->
+            <div class="card">
+                <h2>📁 Файлы CRITICAL</h2>
+                {% if critical_files %}
+                <table>
+                    <tr><th>Файл</th><th>Размер</th><th>Строк</th></tr>
+                    {% for f in critical_files %}
+                    <tr>
+                        <td style="font-family:monospace;font-size:0.75rem;">{{ f.name }}</td>
+                        <td>{{ f.size }}</td>
+                        <td><span class="tag {{ 'red' if f.lines > 0 else '' }}">{{ f.lines }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <div class="empty">Нет файлов</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

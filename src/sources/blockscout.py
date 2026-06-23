@@ -18,9 +18,8 @@ BLOCKSCOUT_URLS: dict[Chain, str] = {
 }
 
 class BlockscoutRecentSource:
-    def __init__(self, max_pages: int = 3, page_size: int = 50):
+    def __init__(self, max_pages: int = 3):
         self._max_pages = max_pages
-        self._page_size = page_size
 
     def fetch(self, chain: Chain) -> list[ContractTarget]:
         base = BLOCKSCOUT_URLS.get(chain)
@@ -29,17 +28,20 @@ class BlockscoutRecentSource:
             return []
 
         targets: list[ContractTarget] = []
-        with httpx.Client(timeout=30) as client:
-            for page in range(1, self._max_pages + 1):
+        next_params: dict | None = None
+
+        with httpx.Client(timeout=30, follow_redirects=True) as client:
+            for _ in range(self._max_pages):
                 try:
+                    params = next_params if next_params else None
                     resp = client.get(
                         f"{base}/smart-contracts",
-                        params={"page": page, "page_size": self._page_size},
-                        headers={"User-Agent": "Mozilla/5.0"},
+                        params=params,
+                        headers={"User-Agent": "token-vuln-scanner/0.1"},
                     )
                     if resp.status_code != 200:
-                        logger.warning("Blockscout %s page %d: HTTP %d", chain.name, page, resp.status_code)
-                        continue
+                        logger.warning("Blockscout %s: HTTP %d", chain.name, resp.status_code)
+                        break
                     data = resp.json()
                     items = data.get("items", [])
                     if not items:
@@ -53,9 +55,12 @@ class BlockscoutRecentSource:
                             address=address.lower(),
                             source="blockscout",
                         ))
+                    next_params = data.get("next_page_params")
+                    if not next_params:
+                        break
                 except Exception as e:
-                    logger.error("Blockscout %s page %d error: %s", chain.name, page, e)
-                    continue
+                    logger.error("Blockscout %s error: %s", chain.name, e)
+                    break
 
         return targets
 

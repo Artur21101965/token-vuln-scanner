@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — Token Vuln Scanner{% endblock %}
+{% block content %}
+
+<div class="stats">
+    {% for row in severity_counts %}
+    <div class="stat-card">
+        <div class="num" style="color: {{ severity_colors.get(row.severity, 'white') }}">{{ row.cnt }}</div>
+        <div class="label">{{ row.severity }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<h2 style="margin-top: 1.5rem">Последние токены</h2>
+<table>
+    <thead>
+        <tr><th>Токен</th><th>Символ</th><th>Сеть</th><th>Последний раз</th></tr>
+    </thead>
+    <tbody>
+        {% for row in latest_tokens %}
+        <tr>
+            <td><a href="/token/{{ row._token_address }}">{{ row._token_address[:10] }}...</a></td>
+            <td>{{ row._token_symbol or '?' }}</td>
+            <td>{{ row._chain or '?' }}</td>
+            <td>{{ row._scanned_at }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">Пока нет данных</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2 style="margin-top: 1.5rem">Последние находки</h2>
+<div id="recent-findings" hx-get="/stats/recent-findings" hx-trigger="load every:10s">
+    <p>Загрузка...</p>
+</div>
+
+{% endblock %}

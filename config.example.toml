@@ -1,9 +1,9 @@
 [rpc]
-ethereum = "https://eth.drpc.org"
+ethereum = "https://ethereum-rpc.publicnode.com"
 bsc = "https://bsc-dataseed.binance.org"
 arbitrum = "https://arb1.arbitrum.io/rpc"
 base = "https://mainnet.base.org"
-polygon = "https://polygon-rpc.com"
+polygon = "https://polygon-bor.publicnode.com"
 avalanche = "https://api.avax.network/ext/bc/C/rpc"
 optimism = "https://mainnet.optimism.io"
 zksync = "https://mainnet.era.zksync.io"
@@ -12,16 +12,17 @@ scroll = "https://rpc.scroll.io"
 solana = "https://api.mainnet-beta.solana.com"
 
 [explorer]
-etherscan_key = ""
-bscscan_key = ""
-arbiscan_key = ""
-basescan_key = ""
-polygonscan_key = ""
-snowtrace_key = ""
-optimistic_key = ""
+etherscan_key = "YOUR_ETHERSCAN_KEY"
+bscscan_key = "YOUR_ETHERSCAN_KEY"
+arbiscan_key = "YOUR_ETHERSCAN_KEY"
+basescan_key = "YOUR_ETHERSCAN_KEY"
+polygonscan_key = "YOUR_ETHERSCAN_KEY"
+snowtrace_key = "YOUR_ETHERSCAN_KEY"
+optimistic_key = "YOUR_ETHERSCAN_KEY"
 zksync_key = ""
 lineascan_key = ""
 scrollscan_key = ""
+github_token = "YOUR_GITHUB_TOKEN"
 
 [monitor]
 min_liquidity_usd = 100
@@ -33,11 +34,16 @@ reports_dir = "reports"
 db_path = "scanner.db"
 
 [telegram]
-bot_token = "8958340685:AAF_f_nZdafLhyLe51x19tTHmQVXl4Vujkw"
-chat_id = "8532534916"
+bot_token = "YOUR_TELEGRAM_BOT_TOKEN"
+chat_id = "YOUR_TELEGRAM_CHAT_ID"
+
+[executor]
+evm_private_key = "YOUR_EVM_PRIVATE_KEY"
+receive_address = "YOUR_RECEIVE_ADDRESS"
+solana_private_key = "YOUR_SOLANA_PRIVATE_KEY"
 
 [wallet]
-ethereum = ""
+ethereum = "0xYOUR_ETH_ADDRESS"
 bsc = ""
 arbitrum = ""
 base = ""
@@ -47,4 +53,4 @@ optimism = ""
 zksync = ""
 linea = ""
 scroll = ""
-solana = ""
+solana = "YOUR_SOLANA_ADDRESS"

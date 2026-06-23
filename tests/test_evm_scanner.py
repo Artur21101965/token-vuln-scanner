@@ -160,7 +160,7 @@ def test_evm_scanner_creates():
     data.get_code.return_value = ""
     data.fallback_detected.return_value = False
     scanner = EvmScanner(data_collector=data, rpc=Mock())
-    assert len(scanner.checks) == 27  # external + deployer/risk + bytecode + cross-contract + historical + storage + sandwich
+    assert len(scanner.checks) == 45  # +storage_collision +unchecked_erc20
 
 
 def test_confidence_filters_fallback_false_positive():

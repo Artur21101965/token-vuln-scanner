@@ -72,8 +72,8 @@ class BaseScanner(ABC):
             ctx.dispatch_selectors = set(selectors.keys())
             ctx.has_fallback = self._data.fallback_detected(token.address)
         findings: list[Finding] = []
-        with ThreadPoolExecutor(max_workers=10) as pool:
-            fut_to_check = {pool.submit(check.run, ctx): check for check in self.checks}
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            fut_to_check = {executor.submit(check.run, ctx): check for check in self.checks}
             for fut in as_completed(fut_to_check):
                 check = fut_to_check[fut]
                 try:

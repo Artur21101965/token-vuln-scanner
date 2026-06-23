@@ -16,10 +16,18 @@ from src.sources.blockscout import BlockscoutRecentSource
 from src.monitors.slot_monitor import SlotMonitor
 from src.monitors.top_token_scanner import TopTokenScanner
 from src.abi_resolver import AbiResolver
+from src.exploit_format import format_exploit_plan
+from src.notifier.telegram import TelegramNotifier
 
 logger = logging.getLogger(__name__)
 
 RESCAN_INTERVAL_HOURS = 6
+
+EXPLOIT_CHECKS = {
+    "unprotected_initialize", "unprotected_withdraw", "unprotected_upgrade",
+    "public_ownership_transfer", "bytecode_selfdestruct",
+    "cross_contract_reentrancy", "mint_function_unprotected",
+}
 
 
 class Analyzer:
@@ -33,6 +41,7 @@ class Analyzer:
         top_token_scanner: Optional[TopTokenScanner] = None,
         abi_resolver: Optional[AbiResolver] = None,
         max_workers: int = 4,
+        telegram_notifier: Optional[TelegramNotifier] = None,
     ):
         self._queue = queue
         self._scanners = scanners
@@ -42,6 +51,7 @@ class Analyzer:
         self._top_token_scanner = top_token_scanner
         self._abi_resolver = abi_resolver
         self._max_workers = max_workers
+        self._telegram = telegram_notifier
         self._last_rescan_check: Optional[datetime] = None
 
     def _get_scanner(self, chain: Chain) -> Optional[BaseScanner]:
@@ -243,6 +253,43 @@ class Analyzer:
         self._reporter.write(report)
         logger.info("Contract scan done %s — %s", target.address[:10], report.summary)
 
+        criticals = [f for f in report.findings if f.severity == Severity.CRITICAL]
+        if not criticals:
+            return
+
+        eth_balance = self._check_eth_balance(target.address, chain)
+        if eth_balance <= 0:
+            logger.debug("CRITICAL finding on %s but balance=0 — skipped", target.address[:10])
+            return
+
+        for finding in criticals:
+            executor = getattr(scanner, '_executor', None)
+            if executor and executor.can_execute(finding) and finding.confidence is not None and finding.confidence >= 0.9:
+                logger.warning(
+                    "EXPLOITABLE: %s on %s — %s (balance=%.6f ETH)",
+                    target.address[:10], chain.name, finding.check_name, eth_balance,
+                )
+
+    def _check_eth_balance(self, address: str, chain: Chain) -> float:
+        try:
+            scanner = self._scanners.get(chain)
+            if scanner is None:
+                return 0.0
+            rpc = getattr(scanner, '_rpc', None)
+            if rpc is None:
+                return 0.0
+            wei = rpc.eth_get_balance(address)
+            return int(wei, 16) / 1e18 if wei and wei != "0x" else 0.0
+        except Exception:
+            return 0.0
+
+    def _notify_exploit(self, message: str) -> None:
+        if self._telegram:
+            try:
+                self._telegram.send(message)
+            except Exception as exc:
+                logger.error("Telegram notify failed: %s", exc)
+
     def process_contract_batch(self) -> int:
         contract_queue = ContractQueue(self._queue.db_path)
         contract_queue.init_db()
@@ -334,11 +381,18 @@ class Analyzer:
                 else:
                     idle_cycles += 1
                     if idle_cycles >= 10:
-                        self._check_slot_changes()
-                        self._rescan_old_tokens()
-                        self._scan_top_tokens()
-                        self._enqueue_blockscout_targets()
-                        self.process_contract_batch()
+                        try:
+                            self._scan_top_tokens()
+                        except Exception:
+                            pass
+                        try:
+                            self._enqueue_blockscout_targets()
+                        except Exception as exc:
+                            logger.error("Blockscout enqueue error: %s", exc)
+                        try:
+                            self.process_contract_batch()
+                        except Exception as exc:
+                            logger.error("Contract batch error: %s", exc)
                         idle_cycles = 0
                     time.sleep(interval)
             except KeyboardInterrupt:

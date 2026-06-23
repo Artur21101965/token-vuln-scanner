@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>Monster Exploit Scanner</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#0d1117;color:#c9d1d9;padding:1rem}
+h1{font-size:1.2rem;color:#f0f6fc}
+h2{font-size:0.9rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem}
+.container{max-width:1400px;margin:0 auto}
+header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;padding-bottom:0.5rem;border-bottom:1px solid #30363d}
+header .pulse{animation:pulse 2s infinite}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tabs{display:flex;gap:0;margin-bottom:1rem;border-bottom:1px solid #30363d}
+.tab{padding:0.5rem 1rem;cursor:pointer;color:#8b949e;border-bottom:2px solid transparent;font-size:0.85rem}
+.tab:hover{color:#c9d1d9}
+.tab.active{color:#58a6ff;border-bottom-color:#58a6ff}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:0.75rem}
+.card{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:0.75rem}
+.stat{text-align:center;padding:0.5rem}
+.stat .num{font-size:1.5rem;font-weight:700}
+.stat .label{font-size:0.65rem;color:#8b949e;text-transform:uppercase}
+.stat.green .num{color:#3fb950}.stat.blue .num{color:#58a6ff}.stat.red .num{color:#f85149}
+.proc{display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid #21262d}
+.proc .dot{width:8px;height:8px;border-radius:50%}
+.proc .dot.on{background:#3fb950}.proc .dot.off{background:#f85149}
+.proc .name{font-weight:500;font-size:0.85rem;min-width:160px}
+.proc .info{font-size:0.7rem;color:#8b949e;flex:1}
+.proc .count{font-size:0.7rem;color:#58a6ff}
+.findings-list{max-height:400px;overflow-y:auto}
+.finding{padding:0.3rem 0.5rem;border-left:3px solid #30363d;margin:0.2rem 0;font-size:0.75rem;font-family:monospace}
+.finding.crit{border-left-color:#f85149}
+.finding .src{color:#8b949e;font-size:0.65rem}
+.gas{display:flex;gap:1rem;flex-wrap:wrap}
+.gas-item{background:#161b22;border:1px solid #30363d;border-radius:4px;padding:0.4rem 0.7rem;font-size:0.8rem}
+.gas-item.ok{color:#3fb950}.gas-item.low{color:#f85149}
+.layers{display:grid;grid-template-columns:repeat(4,1fr);gap:0.3rem}
+.layer{background:#161b22;border:1px solid #30363d;border-radius:4px;padding:0.4rem;font-size:0.7rem;text-align:center}
+.layer .ln{color:#58a6ff;font-weight:600}.layer .ld{color:#8b949e;font-size:0.65rem}
+footer{text-align:center;color:#484f58;font-size:0.7rem;margin-top:1rem;padding-top:0.5rem;border-top:1px solid #30363d}
+</style>
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(name).classList.add('active');
+}
+</script>
+</head>
+<body>
+<div class="container">
+<header>
+  <h1>🦖 Monster Exploit Scanner</h1>
+  <span style="font-size:0.7rem;color:#8b949e">{{ stats.processes_alive }}/{{ stats.processes_total }} процессов</span>
+  <span class="pulse" style="color:#3fb950;font-size:0.7rem;margin-left:auto">● онлайн</span>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="overview" onclick="switchTab('overview')">📊 Обзор</div>
+  <div class="tab" data-tab="processes" onclick="switchTab('processes')">⚙️ Процессы</div>
+  <div class="tab" data-tab="findings" onclick="switchTab('findings')">🔍 Находки</div>
+</div>
+
+<!-- OVERVIEW TAB -->
+<div id="overview" class="tab-content active">
+  <div class="grid4">
+    <div class="stat green"><div class="num">{{ stats.processes_alive }}</div><div class="label">Процессов</div></div>
+    <div class="stat blue"><div class="num">{{ stats.findings_db + stats.findings_txt }}</div><div class="label">Находок</div></div>
+    <div class="stat blue"><div class="num">{{ stats.keys_monitored }}</div><div class="label">Ключей</div></div>
+    <div class="stat blue"><div class="num">{{ stats.contracts_fuzzed }}</div><div class="label">Фаззинг</div></div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h2>⛽ Газ</h2>
+      <div class="gas">
+      {% for g in gas %}
+        <div class="gas-item {{ 'ok' if g.ok else 'low' }}">{{ g.chain }}: {{ g.balance }}</div>
+      {% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <h2>🔑 Ключи в мониторинге</h2>
+      <div class="stat blue"><div class="num">{{ stats.keys_monitored }}</div></div>
+      <div style="font-size:0.7rem;color:#8b949e">Проверяются каждые 30 мин на 7 цепях</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:0.75rem">
+    <h2>📚 Слои поиска</h2>
+    <div class="layers">
+      <div class="layer"><div class="ln">CoinGecko</div><div class="ld">300 токенов</div></div>
+      <div class="layer"><div class="ln">Uniswap V2</div><div class="ld">200 пар</div></div>
+      <div class="layer"><div class="ln">Blockscout</div><div class="ld">Свежие</div></div>
+      <div class="layer"><div class="ln">Transfer Events</div><div class="ld">Активные</div></div>
+      <div class="layer"><div class="ln">Known Targets</div><div class="ld">Мосты,CEX</div></div>
+      <div class="layer"><div class="ln">Sushi/Pancake</div><div class="ld">400 пар</div></div>
+      <div class="layer"><div class="ln">MEV Searchers</div><div class="ld">Боты</div></div>
+      <div class="layer"><div class="ln">NFT/ERC-4337</div><div class="ld">Маркетплейсы</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- PROCESSES TAB -->
+<div id="processes" class="tab-content">
+  {% for p in processes %}
+  <div class="proc" title="{{ p.desc_long }}">
+    <div class="dot {{ 'on' if p.alive else 'off' }}"></div>
+    <div class="name">{{ p.name }}</div>
+    <div class="info">{{ p.desc_short }}
+      {% if p.alive and p.instances %}
+        {% for inst in p.instances[:3] %}
+          <span style="color:#58a6ff">| {{ inst.chain }}</span>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div class="count">{% if p.alive %}×{{ p.count }}{% else %}—{% endif %}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- FINDINGS TAB -->
+<div id="findings" class="tab-content">
+  <div class="card">
+    <h2>📋 Последние находки ({{ findings|length }})</h2>
+    <div class="findings-list">
+    {% if findings %}
+      {% for f in findings %}
+      <div class="finding {{ 'crit' if 'CRITICAL' in f.text else '' }}">
+        <span class="src">[{{ f.source }}]</span> {{ f.text }}
+        {% if f.verdict %}<div style="color:#d2991d;font-size:0.7rem;margin-top:2px">📋 Вердикт: {{ f.verdict }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div style="color:#484f58;padding:1rem;text-align:center">Пока ничего. Система ищет...</div>
+    {% endif %}
+    </div>
+  </div>
+</div>
+
+<footer>
+  Monster Exploit Scanner | Дашборд | {{ now }} | Автообновление 60с | http://localhost:8000
+</footer>
+</div>
+</body>
+</html>
